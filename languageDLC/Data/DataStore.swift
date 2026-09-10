@@ -16,6 +16,14 @@ final class DataStore {
         languagesByCode = Dictionary(uniqueKeysWithValues: languages.map { ($0.code, $0) })
     }
 
+    /// Test-only constructor: bypasses the bundle and builds a store from in-memory data.
+    init(territories: [String: Territory], languages: [Language], countries: [CountryGeometry]) {
+        self.territories = territories
+        self.languages = languages
+        self.countries = countries
+        self.languagesByCode = Dictionary(uniqueKeysWithValues: languages.map { ($0.code, $0) })
+    }
+
     private static func load<T: Decodable>(_ file: String, _ type: T.Type) -> T {
         guard let url = Bundle.main.url(forResource: file, withExtension: nil) else {
             fatalError("""
