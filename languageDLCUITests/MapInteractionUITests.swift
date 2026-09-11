@@ -9,8 +9,7 @@ final class MapInteractionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        let summary = app.staticTexts.containing(
-            NSPredicate(format: "label CONTAINS %@", "of the world")).firstMatch
+        let summary = app.staticTexts["worldSummary"]
         XCTAssertTrue(summary.waitForExistence(timeout: 15))
         let before = summary.label
 

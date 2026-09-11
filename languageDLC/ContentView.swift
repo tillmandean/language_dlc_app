@@ -40,9 +40,7 @@ struct ContentView: View {
             }
 
             VStack {
-                Text(summary)
-                    .font(.footnote.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.8))
+                StatsHUD(state: state)
                 Spacer()
                 controls
             }
