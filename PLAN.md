@@ -1138,10 +1138,10 @@ threshold (10/25/50/75%), show a brief "achievement" toast. That is the DLC meta
    thread behind a loading state.
 
 ### Done when
-- [ ] Globe cannot be rotated past the poles.
-- [ ] List mode is fully usable with VoiceOver on.
-- [ ] Memory in Instruments stays under 200 MB while toggling languages repeatedly.
-- [ ] Attribution sheet exists.
+- [x] Globe cannot be rotated past the poles.
+- [x] List mode is fully usable with VoiceOver on.
+- [x] Memory in Instruments stays under 200 MB while toggling languages repeatedly.
+- [x] Attribution sheet exists.
 
 ---
 

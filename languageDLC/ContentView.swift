@@ -15,6 +15,8 @@ struct ContentView: View {
     @State private var texture: CGImage?
     @State private var showCalibration = false
     @State private var showPicker = false
+    @State private var showList = false
+    @State private var showAttribution = false
 
     private let haptic = UIImpactFeedbackGenerator(style: .light)
 
@@ -22,21 +24,20 @@ struct ContentView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            GlobeView(texture: texture) { u, v in
-                let territory = MapRasterizer.shared.territory(atU: u, v: v)
-                state.focused = territory
-                if territory != nil { haptic.impactOccurred() }
-            }
-            .ignoresSafeArea()
-            .sheet(item: focusedTerritory) { entry in
-                CountryDetailSheet(code: entry.code, state: state)
-            }
-            .sheet(isPresented: $showPicker) {
-                LanguagePickerSheet(state: state)
-            }
+            if showList {
+                CountryListView(state: state)
+            } else {
+                GlobeView(texture: texture) { u, v in
+                    let territory = MapRasterizer.shared.territory(atU: u, v: v)
+                    state.focused = territory
+                    if territory != nil { haptic.impactOccurred() }
+                }
+                .ignoresSafeArea()
+                .accessibilityLabel(globeAccessibilityLabel)
 
-            if texture == nil {
-                ProgressView().tint(.white)
+                if texture == nil {
+                    ProgressView().tint(.white)
+                }
             }
 
             VStack {
@@ -45,6 +46,15 @@ struct ContentView: View {
                 controls
             }
             .padding()
+        }
+        .sheet(item: focusedTerritory) { entry in
+            CountryDetailSheet(code: entry.code, state: state)
+        }
+        .sheet(isPresented: $showPicker) {
+            LanguagePickerSheet(state: state)
+        }
+        .sheet(isPresented: $showAttribution) {
+            AttributionSheet()
         }
         .task(id: renderKey) {
             let colors = state.fillColors()
@@ -75,6 +85,25 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
 
+                Button {
+                    showList.toggle()
+                } label: {
+                    Image(systemName: showList ? "globe.americas.fill" : "list.bullet")
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+                .accessibilityLabel(showList ? "Globe" : "List")
+                .accessibilityHint("Switch to a VoiceOver-friendly list of countries")
+
+                Button {
+                    showAttribution = true
+                } label: {
+                    Image(systemName: "info.circle")
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+                .accessibilityLabel("Data & credits")
+
                 #if DEBUG
                 Button(showCalibration ? "Map" : "Calibrate") { showCalibration.toggle() }
                     .buttonStyle(.bordered)
@@ -101,6 +130,16 @@ struct ContentView: View {
             get: { state.focused.map(FocusedTerritory.init) },
             set: { state.focused = $0?.code }
         )
+    }
+
+    /// VoiceOver can't hit-test the sphere, so its label states the numbers instead and points
+    /// at the accessible alternative.
+    private var globeAccessibilityLabel: String {
+        let s = state.stats
+        let pct = String(format: "%.1f", s.fraction * 100)
+        return "World map, not accessible to VoiceOver. \(pct) percent of the world unlocked, " +
+            "\(s.countriesAny) countries, official in \(s.countriesOfficial). " +
+            "Use the List button to browse countries instead."
     }
 
     private var summary: String {

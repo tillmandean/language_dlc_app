@@ -196,6 +196,32 @@ struct GlobeProjectionTests {
     }
 }
 
+/// §9.1: custom drag rotation must never let the globe flip past a pole.
+@MainActor
+struct GlobeGestureTests {
+
+    @Test func pitchClampsToEightyDegreesEachDirection() throws {
+        let coordinator = GlobeView.Coordinator(onTap: { _, _ in })
+        let maxPitch = Float(80) * .pi / 180
+
+        // A huge downward drag should stop exactly at the clamp, not overshoot past the pole.
+        coordinator.applyRotation(dx: 0, dy: 100_000)
+        #expect(abs(coordinator.pitch - maxPitch) < 0.0001)
+
+        // ...and back the other way past the opposite clamp.
+        coordinator.applyRotation(dx: 0, dy: -200_000)
+        #expect(abs(coordinator.pitch + maxPitch) < 0.0001)
+    }
+
+    @Test func yawIsUnclampedAndAccumulates() throws {
+        let coordinator = GlobeView.Coordinator(onTap: { _, _ in })
+        coordinator.applyRotation(dx: 100, dy: 0)
+        coordinator.applyRotation(dx: 100, dy: 0)
+        #expect(coordinator.yaw > 0)
+        #expect(coordinator.pitch == 0)
+    }
+}
+
 /// The globe has to redraw every frame while the user drags it, so a frame must cost well
 /// under the 16.6 ms that 60 fps allows — with the full 4096x2048 texture on it.
 @MainActor

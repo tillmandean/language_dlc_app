@@ -14,6 +14,11 @@ final class MapRasterizer {
     /// Built lazily on first use, off whichever thread touches it first.
     static let shared = MapRasterizer(countries: DataStore.shared.countries)
 
+    /// The one place to shrink the texture (e.g. to 2048x1024) if memory warnings show up on
+    /// older devices — everything else derives from these two numbers.
+    static let defaultWidth = 4096
+    static let defaultHeight = 2048
+
     let width: Int
     let height: Int
     /// The pick map is half resolution: plenty for tap accuracy, a quarter of the memory.
@@ -32,7 +37,8 @@ final class MapRasterizer {
 
     private static let colorSpace = CGColorSpaceCreateDeviceRGB()
 
-    init(countries: [CountryGeometry], width: Int = 4096, height: Int = 2048) {
+    init(countries: [CountryGeometry], width: Int = MapRasterizer.defaultWidth,
+        height: Int = MapRasterizer.defaultHeight) {
         self.width = width
         self.height = height
         self.pickWidth = max(1, width / 2)

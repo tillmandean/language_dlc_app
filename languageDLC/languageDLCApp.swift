@@ -12,6 +12,7 @@ struct languageDLCApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.dark)   // the app is dark-only by design
         }
     }
 }

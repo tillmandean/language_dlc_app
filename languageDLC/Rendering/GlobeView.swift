@@ -1,5 +1,6 @@
 import SwiftUI
 import SceneKit
+import QuartzCore
 
 /// Where the texture's (u, v) sits on `SCNSphere`, calibrated once against the sphere's own
 /// UV source (§5.1) rather than guessed.
@@ -48,7 +49,6 @@ struct GlobeView: UIViewRepresentable {
         view.pointOfView = built.camera
         view.backgroundColor = .black
         view.antialiasingMode = .multisampling2X
-        view.allowsCameraControl = true          // replaced with custom gestures in Phase 9
         view.autoenablesDefaultLighting = false
         view.isPlaying = true                    // actions only advance on a playing view
 
@@ -61,7 +61,16 @@ struct GlobeView: UIViewRepresentable {
         let tap = UITapGestureRecognizer(target: context.coordinator,
                                          action: #selector(Coordinator.handleTap(_:)))
         view.addGestureRecognizer(tap)
+        let pan = UIPanGestureRecognizer(target: context.coordinator,
+                                         action: #selector(Coordinator.handlePan(_:)))
+        view.addGestureRecognizer(pan)
+        let pinch = UIPinchGestureRecognizer(target: context.coordinator,
+                                             action: #selector(Coordinator.handlePinch(_:)))
+        view.addGestureRecognizer(pinch)
+
         context.coordinator.view = view
+        context.coordinator.globe = globe
+        context.coordinator.camera = built.camera
         return view
     }
 
@@ -129,6 +138,8 @@ struct GlobeView: UIViewRepresentable {
 
     final class Coordinator: NSObject {
         weak var view: SCNView?
+        weak var globe: SCNNode?
+        weak var camera: SCNNode?
         var onTap: (Double, Double) -> Void
         /// The image currently on the sphere, so a redundant update can skip the upload.
         var appliedTexture: CGImage?
@@ -139,6 +150,107 @@ struct GlobeView: UIViewRepresentable {
                   let (u, v) = GlobeView.textureCoordinate(in: view, at: g.location(in: view))
             else { return }
             onTap(u, v)
+        }
+
+        // MARK: - Rotation (drag) and momentum
+
+        /// Radians per point of drag translation or per point/second of release velocity — the
+        /// same factor for both keeps a flick feel like a continuation of the drag that caused it.
+        private static let rotationScale: Double = 0.005
+        private static let maxPitch: Float = 80 * .pi / 180   // never flip over a pole
+
+        private(set) var pitch: Float = 0    // rotation around X, exposed for the pitch-clamp test
+        private(set) var yaw: Float = 0      // rotation around Y
+
+        private var angularVelocityX: Double = 0   // rad/s, decaying after a flick
+        private var angularVelocityY: Double = 0
+        private var displayLink: CADisplayLink?
+        private var lastMomentumTimestamp: CFTimeInterval?
+
+        @objc func handlePan(_ g: UIPanGestureRecognizer) {
+            guard let view else { return }
+            switch g.state {
+            case .began:
+                stopMomentum()
+            case .changed:
+                let t = g.translation(in: view)
+                g.setTranslation(.zero, in: view)
+                applyRotation(dx: Double(t.x), dy: Double(t.y))
+            case .ended:
+                let v = g.velocity(in: view)
+                angularVelocityY = Double(v.x) * Self.rotationScale
+                angularVelocityX = Double(v.y) * Self.rotationScale
+                startMomentum()
+            default:
+                break
+            }
+        }
+
+        /// `dx`, `dy` are points of drag translation. Not private so tests can drive it directly
+        /// without a real `UIPanGestureRecognizer`.
+        func applyRotation(dx: Double, dy: Double) {
+            rotate(byYaw: Float(dx * Self.rotationScale), pitch: Float(dy * Self.rotationScale))
+        }
+
+        private func rotate(byYaw dYaw: Float, pitch dPitch: Float) {
+            yaw += dYaw
+            pitch = min(max(pitch + dPitch, -Self.maxPitch), Self.maxPitch)
+            globe?.eulerAngles = SCNVector3(pitch, yaw, 0)
+        }
+
+        private func startMomentum() {
+            guard angularVelocityX != 0 || angularVelocityY != 0 else { return }
+            lastMomentumTimestamp = nil
+            let link = CADisplayLink(target: self, selector: #selector(stepMomentum(_:)))
+            link.add(to: .main, forMode: .common)
+            displayLink = link
+        }
+
+        private func stopMomentum() {
+            displayLink?.invalidate()
+            displayLink = nil
+            angularVelocityX = 0
+            angularVelocityY = 0
+        }
+
+        /// Exponential decay tuned so a flick's rotation has mostly died out by `momentumDuration`.
+        private static let momentumDuration: CFTimeInterval = 0.8
+        private static let momentumTimeConstant = momentumDuration / 3
+        private static let stopThreshold = 0.01   // rad/s
+
+        @objc private func stepMomentum(_ link: CADisplayLink) {
+            defer { lastMomentumTimestamp = link.timestamp }
+            guard let last = lastMomentumTimestamp else { return }
+            let dt = link.timestamp - last
+            guard dt > 0, dt < 1 else { return }
+
+            rotate(byYaw: Float(angularVelocityY * dt), pitch: Float(angularVelocityX * dt))
+
+            let decay = exp(-dt / Self.momentumTimeConstant)
+            angularVelocityX *= decay
+            angularVelocityY *= decay
+            if abs(angularVelocityX) < Self.stopThreshold, abs(angularVelocityY) < Self.stopThreshold {
+                stopMomentum()
+            }
+        }
+
+        // MARK: - Zoom (pinch)
+
+        private static let minCameraZ: Double = 1.6
+        private static let maxCameraZ: Double = 6
+        private var pinchStartZ: Double = 3
+
+        @objc func handlePinch(_ g: UIPinchGestureRecognizer) {
+            guard let camera else { return }
+            switch g.state {
+            case .began:
+                pinchStartZ = Double(camera.position.z)
+            case .changed:
+                let z = min(max(pinchStartZ / Double(g.scale), Self.minCameraZ), Self.maxCameraZ)
+                camera.position.z = Float(z)
+            default:
+                break
+            }
         }
     }
 }

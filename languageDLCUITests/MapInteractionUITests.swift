@@ -53,4 +53,47 @@ final class MapInteractionUITests: XCTestCase {
         }
         XCTFail("no tap anywhere on the globe resolved to a country, last label: \(label.label)")
     }
+
+    /// §9.2: the accessible alternative to the globe. Toggling to it must show a plain list
+    /// of countries and toggling back must restore the globe.
+    @MainActor
+    func testListModeTogglesTheAccessibleCountryList() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        let listButton = app.buttons["List"]
+        XCTAssertTrue(listButton.waitForExistence(timeout: 15))
+        listButton.tap()
+
+        let list = app.descendants(matching: .any).matching(identifier: "countryList").firstMatch
+        XCTAssertTrue(list.waitForExistence(timeout: 10))
+        XCTAssertTrue(list.cells.count > 0)
+
+        let globeButton = app.buttons["Globe"]
+        XCTAssertTrue(globeButton.waitForExistence(timeout: 5))
+        globeButton.tap()
+        XCTAssertFalse(list.exists)
+    }
+
+    /// §9.4: the data caveat sheet must be reachable and dismissible without disturbing the map.
+    @MainActor
+    func testAttributionSheetOpensAndDismisses() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        let infoButton = app.buttons["Data & credits"]
+        XCTAssertTrue(infoButton.waitForExistence(timeout: 15))
+        infoButton.tap()
+
+        let title = app.navigationBars["Data & credits"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+
+        app.swipeDown(velocity: .fast)
+        XCTAssertTrue(waitForDisappearance(of: title, timeout: 5))
+    }
+
+    private func waitForDisappearance(of element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
+        return XCTWaiter().wait(for: [gone], timeout: timeout) == .completed
+    }
 }
