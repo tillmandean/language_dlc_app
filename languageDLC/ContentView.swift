@@ -84,48 +84,53 @@ struct ContentView: View {
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("focusedTerritory")
 
-            HStack(spacing: 12) {
-                Button {
-                    showPicker = true
-                } label: {
-                    Label("Languages", systemImage: "globe")
-                }
-                .buttonStyle(.borderedProminent)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    Button {
+                        showPicker = true
+                    } label: {
+                        Label("Languages", systemImage: "globe")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .fixedSize()
 
-                Button {
-                    showList.toggle()
-                } label: {
-                    Image(systemName: showList ? "globe.americas.fill" : "list.bullet")
-                }
-                .buttonStyle(.bordered)
-                .tint(.white)
-                .accessibilityLabel(showList ? "Globe" : "List")
-                .accessibilityHint("Switch to a VoiceOver-friendly list of countries")
-
-                Button {
-                    showAttribution = true
-                } label: {
-                    Image(systemName: "info.circle")
-                }
-                .buttonStyle(.bordered)
-                .tint(.white)
-                .accessibilityLabel("Data & credits")
-
-                Button {
-                    shareGlobe()
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .buttonStyle(.bordered)
-                .tint(.white)
-                .disabled(state.selected.isEmpty || texture == nil)
-                .accessibilityLabel("Share")
-
-                #if DEBUG
-                Button(showCalibration ? "Map" : "Calibrate") { showCalibration.toggle() }
+                    Button {
+                        showList.toggle()
+                    } label: {
+                        Image(systemName: showList ? "globe.americas.fill" : "list.bullet")
+                    }
                     .buttonStyle(.bordered)
                     .tint(.white)
-                #endif
+                    .accessibilityLabel(showList ? "Globe" : "List")
+                    .accessibilityHint("Switch to a VoiceOver-friendly list of countries")
+
+                    Button {
+                        showAttribution = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.white)
+                    .accessibilityLabel("Data & credits")
+
+                    Button {
+                        shareGlobe()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.white)
+                    .disabled(state.selected.isEmpty || texture == nil)
+                    .accessibilityLabel("Share")
+
+                    #if DEBUG
+                    Button(showCalibration ? "Map" : "Calibrate") { showCalibration.toggle() }
+                        .buttonStyle(.bordered)
+                        .tint(.white)
+                        .fixedSize()
+                    #endif
+                }
+                .padding(.horizontal, 2)   // room for the focus ring/shadow at the scroll edges
             }
         }
     }
