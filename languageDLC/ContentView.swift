@@ -2,9 +2,9 @@
 //  ContentView.swift
 //  languageDLC
 //
-//  Milestone B: the map texture wrapped on a rotatable globe. The hard-coded language
-//  buttons and the tapped-country readout are temporary; Phases 6–8 replace them with the
-//  detail sheet, the picker and the HUD.
+//  Milestone B: the map texture wrapped on a rotatable globe, with a country detail sheet
+//  and the language picker. The tapped-country readout is temporary; Phase 8 replaces it
+//  with the stats HUD.
 //
 
 import SwiftUI
@@ -14,8 +14,8 @@ struct ContentView: View {
     @State private var state = AppState()
     @State private var texture: CGImage?
     @State private var showCalibration = false
+    @State private var showPicker = false
 
-    private let demoLanguages = ["es", "fr"]
     private let haptic = UIImpactFeedbackGenerator(style: .light)
 
     var body: some View {
@@ -30,6 +30,9 @@ struct ContentView: View {
             .ignoresSafeArea()
             .sheet(item: focusedTerritory) { entry in
                 CountryDetailSheet(code: entry.code, state: state)
+            }
+            .sheet(isPresented: $showPicker) {
+                LanguagePickerSheet(state: state)
             }
 
             if texture == nil {
@@ -67,14 +70,13 @@ struct ContentView: View {
                 .accessibilityIdentifier("focusedTerritory")
 
             HStack(spacing: 12) {
-                ForEach(demoLanguages, id: \.self) { code in
-                    let isOn = state.selected.contains(code)
-                    Button(DataStore.shared.languagesByCode[code]?.displayName ?? code) {
-                        state.toggle(code)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(isOn ? .accentColor : .gray)
+                Button {
+                    showPicker = true
+                } label: {
+                    Label("Languages", systemImage: "globe")
                 }
+                .buttonStyle(.borderedProminent)
+
                 #if DEBUG
                 Button(showCalibration ? "Map" : "Calibrate") { showCalibration.toggle() }
                     .buttonStyle(.bordered)

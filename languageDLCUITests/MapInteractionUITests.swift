@@ -9,14 +9,14 @@ final class MapInteractionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        let spanish = app.buttons["Spanish"]
-        XCTAssertTrue(spanish.waitForExistence(timeout: 15))
-
         let summary = app.staticTexts.containing(
             NSPredicate(format: "label CONTAINS %@", "of the world")).firstMatch
         XCTAssertTrue(summary.waitForExistence(timeout: 15))
         let before = summary.label
 
+        app.buttons["Languages"].tap()
+        let spanish = app.buttons["Spanish"]
+        XCTAssertTrue(spanish.waitForExistence(timeout: 10))
         spanish.tap()
 
         let changed = expectation(for: NSPredicate(format: "label != %@", before),
@@ -24,8 +24,11 @@ final class MapInteractionUITests: XCTestCase {
         wait(for: [changed], timeout: 10)
         XCTAssertNotEqual(summary.label, before)
 
-        // The app is still responsive: toggle back and the summary returns to where it started.
-        spanish.tap()
+        // The app is still responsive: toggle back (now in the pinned "Selected" section) and
+        // the summary returns to where it started.
+        let selectedSpanish = app.buttons["Spanish"]
+        XCTAssertTrue(selectedSpanish.waitForExistence(timeout: 10))
+        selectedSpanish.tap()
         let restored = expectation(for: NSPredicate(format: "label == %@", before),
                                    evaluatedWith: summary)
         wait(for: [restored], timeout: 10)

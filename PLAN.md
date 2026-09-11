@@ -102,21 +102,40 @@ A phase is not done until the build command prints `** BUILD SUCCEEDED **`.
 
 ---
 
-### 0.5 Where things stand (updated 2026-09-11, end of Phase 6)
+### 0.5 Where things stand (updated 2026-09-11, end of Phase 7)
 
-**Resume at Phase 7.** Phases 0–6 are implemented and committed (`532e714`, `be2add3`,
-`55116fc`, `10d3765`, `2cfbb82`, `4ad2470`, and Phase 6's commit). Both commands in §0.3 pass on
-the iPhone 17 simulator: the build prints `** BUILD SUCCEEDED **` and the full test suite — 26
-unit tests plus 5 UI tests — is green. (A UI-test run occasionally fails to launch the xctrunner
-with `FBSOpenApplicationServiceErrorDomain`, and `GlobeRenderingTests` occasionally reports a
-slow frame on a loaded simulator; both are simulator flakes, not the app. Re-run.)
+**Resume at Phase 8.** Phases 0–7 are implemented and committed (`532e714`, `be2add3`,
+`55116fc`, `10d3765`, `2cfbb82`, `4ad2470`, Phase 6's commit, and Phase 7's commit). Both commands
+in §0.3 pass on the iPhone 17 simulator: the build prints `** BUILD SUCCEEDED **` and the full
+test suite — 26 unit tests plus 5 UI tests — is green. (A UI-test run occasionally fails to
+launch the xctrunner with `FBSOpenApplicationServiceErrorDomain`, and `GlobeRenderingTests`
+occasionally reports a slow frame on a loaded simulator; both are simulator flakes, not the app.
+Re-run.)
 
 Phase 6 added `languageDLC/Views/CountryDetailSheet.swift` and its `FocusedTerritory` wrapper.
 `AppState.focused` stayed a plain `String?` — `ContentView` bridges it to `.sheet(item:)` with a
 local `Binding<FocusedTerritory?>` rather than changing `AppState`'s stored type, so the existing
-`focusedTerritory` accessibility label and `MapInteractionUITests` keep working unmodified. The
-temporary Spanish/French buttons are still in `ContentView`; Phase 7 replaces them with the real
-language picker.
+`focusedTerritory` accessibility label and `MapInteractionUITests` keep working unmodified.
+
+Phase 7 added `languageDLC/Views/LanguagePickerSheet.swift` and removed the temporary
+Spanish/French buttons from `ContentView`, replacing them with a single "Languages" button that
+presents the picker. Notes for Phase 8+:
+
+- `AppState.maxSelected` (= `Palette.languageHues.count`, 8) is now enforced inside
+  `AppState.toggle(_:)` itself — it silently no-ops past the cap rather than growing the array.
+  Callers that want to explain *why* (the picker's "Up to 8 languages" alert) check
+  `selected.count >= AppState.maxSelected` themselves before calling `toggle`; `CountryDetailSheet`
+  calls `toggle` directly and relies on the silent no-op, so adding an 8th-plus language there is
+  currently a quiet non-event rather than an alert. Revisit if that turns out to be confusing.
+- `Language.nativeName` (in `Models.swift`) is best-effort — `Locale(identifier: code)
+  .localizedString(forLanguageCode: code)` returns `nil` for some macrolanguage/script codes.
+  Callers must treat `nil` as "don't show a second line," not as an error.
+- The picker excludes already-selected languages from the main (searchable) list — they only
+  appear in the pinned "Selected" section — to avoid duplicate rows. Search matches
+  `displayName`, the raw CLDR `name`, `nativeName`, and `code`.
+- `MapInteractionUITests.testTogglingLanguageUpdatesTheMap` now drives the real picker (tap
+  "Languages", tap the "Spanish" row, tap it again to deselect) instead of a dedicated demo
+  button — keep that flow in mind if the picker's row structure changes.
 
 Facts established at runtime that Phases 6–9 depend on:
 

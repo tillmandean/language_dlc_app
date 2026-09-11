@@ -13,6 +13,9 @@ final class AppState {
                                                     countriesOfficial: 0)
     var focused: String?                    // tapped territory
 
+    /// The palette has this many distinct hues; selecting more would reuse a color.
+    static let maxSelected = Palette.languageHues.count
+
     private let store = DataStore.shared
     private let key = "selectedLanguages"
 
@@ -21,9 +24,11 @@ final class AppState {
         recompute()
     }
 
+    /// No-ops past `maxSelected` rather than growing the array — callers that want to tell the
+    /// user why (e.g. the language picker) should check `selected.count` before calling this.
     func toggle(_ code: String) {
         if let i = selected.firstIndex(of: code) { selected.remove(at: i) }
-        else { selected.append(code) }
+        else if selected.count < Self.maxSelected { selected.append(code) }
     }
 
     func hue(for code: String) -> CGFloat {

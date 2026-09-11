@@ -44,6 +44,13 @@ struct Language: Codable, Identifiable, Hashable {
     var displayName: String {
         Locale.current.localizedString(forLanguageCode: code) ?? name
     }
+
+    /// The language's own name for itself (e.g. "Español" for Spanish), if distinct from
+    /// `displayName`. Best-effort: some codes (macrolanguages, script variants) resolve to
+    /// nothing meaningful, so callers should treat `nil` as "don't show a second line."
+    var nativeName: String? {
+        Locale(identifier: code).localizedString(forLanguageCode: code)?.capitalized
+    }
 }
 
 struct CountryGeometry: Codable, Identifiable {
