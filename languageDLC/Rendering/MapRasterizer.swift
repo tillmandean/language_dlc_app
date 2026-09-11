@@ -12,7 +12,8 @@ import Foundation
 final class MapRasterizer {
 
     /// Built lazily on first use, off whichever thread touches it first.
-    static let shared = MapRasterizer(countries: DataStore.shared.countries)
+    static let shared = MapRasterizer(countries: DataStore.shared.countries,
+                                      regions: DataStore.shared.regions)
 
     /// The one place to shrink the texture (e.g. to 2048x1024) if memory warnings show up on
     /// older devices — everything else derives from these two numbers.
@@ -26,6 +27,9 @@ final class MapRasterizer {
     let pickHeight: Int
 
     private(set) var ids: [String] = []          // index -> territory code
+    /// Curated sub-national regions (Phase 10.4), drawn on top of the country fill. Not part of
+    /// the pick map — tapping still resolves to the country underneath.
+    private(set) var regionIds: [String] = []
 
     private struct Shape {
         let path: CGPath      // three copies (-width, 0, +width), texture pixel space
@@ -33,21 +37,31 @@ final class MapRasterizer {
         let label: CGPoint    // labelLon/labelLat in texture pixel space
     }
     private var shapes: [Shape] = []             // parallel to ids
+    private var regionShapes: [Shape] = []       // parallel to regionIds
     private var pickBuffer: [UInt8] = []         // RGBA, pickWidth * pickHeight * 4
 
     private static let colorSpace = CGColorSpaceCreateDeviceRGB()
 
-    init(countries: [CountryGeometry], width: Int = MapRasterizer.defaultWidth,
-        height: Int = MapRasterizer.defaultHeight) {
+    init(countries: [CountryGeometry], regions: [RegionGeometry] = [],
+        width: Int = MapRasterizer.defaultWidth, height: Int = MapRasterizer.defaultHeight) {
         self.width = width
         self.height = height
         self.pickWidth = max(1, width / 2)
         self.pickHeight = max(1, height / 2)
 
         for country in countries {
-            guard let shape = Self.makeShape(country, width: width, height: height) else { continue }
+            guard let shape = Self.makeShape(rings: country.rings, labelLon: country.labelLon,
+                                             labelLat: country.labelLat, width: width, height: height)
+            else { continue }
             ids.append(country.id)
             shapes.append(shape)
+        }
+        for region in regions {
+            guard let shape = Self.makeShape(rings: region.rings, labelLon: region.labelLon,
+                                             labelLat: region.labelLat, width: width, height: height)
+            else { continue }
+            regionIds.append(region.id)
+            regionShapes.append(shape)
         }
         renderPickMap()
     }
@@ -55,13 +69,15 @@ final class MapRasterizer {
     // MARK: - Geometry
 
     /// Projects every ring into pixel space, unwrapping longitudes across the antimeridian and
-    /// emitting three copies of the result so the wrapped parts land back on the canvas.
-    private static func makeShape(_ country: CountryGeometry, width: Int, height: Int) -> Shape? {
+    /// emitting three copies of the result so the wrapped parts land back on the canvas. Shared
+    /// by countries and curated regions — both are just a set of rings plus a label point.
+    private static func makeShape(rings: [[Double]], labelLon: Double, labelLat: Double,
+                                  width: Int, height: Int) -> Shape? {
         let w = CGFloat(width), h = CGFloat(height)
         let base = CGMutablePath()
         var hasRing = false
 
-        for ring in country.rings {
+        for ring in rings {
             guard ring.count >= 6 else { continue }        // needs 3+ points
             var previousLon = ring[0]
             var running = ring[0]
@@ -102,18 +118,21 @@ final class MapRasterizer {
             full.addPath(base, transform: CGAffineTransform(translationX: dx, y: 0))
         }
 
-        let label = CGPoint(x: (CGFloat(country.labelLon) + 180) / 360 * w,
-                            y: (90 - CGFloat(country.labelLat)) / 180 * h)
+        let label = CGPoint(x: (CGFloat(labelLon) + 180) / 360 * w,
+                            y: (90 - CGFloat(labelLat)) / 180 * h)
         return Shape(path: full, bounds: bounds, label: label)
     }
 
     // MARK: - Visible texture
 
     /// Draws the visible globe texture. Cached paths make this a fill pass, not a re-parse.
+    /// `regionColors` is looked up by curated region id (Phase 10.4) — a region with no entry is
+    /// left undrawn entirely, so the country's own fill underneath keeps showing through.
     func renderTexture(colors: [String: CGColor],
                        ocean: CGColor,
                        lockedLand: CGColor,
-                       borders: CGColor) -> CGImage? {
+                       borders: CGColor,
+                       regionColors: [String: CGColor] = [:]) -> CGImage? {
         guard let ctx = makeContext(width: width, height: height) else { return nil }
         ctx.setFillColor(ocean)
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
@@ -135,6 +154,22 @@ final class MapRasterizer {
         for shape in shapes {
             ctx.addPath(shape.path)
             ctx.strokePath()
+        }
+
+        if !regionColors.isEmpty {
+            for (i, shape) in regionShapes.enumerated() {
+                guard let color = regionColors[regionIds[i]] else { continue }
+                ctx.setFillColor(color)
+                ctx.addPath(shape.path)
+                ctx.fillPath(using: .evenOdd)
+            }
+            ctx.setStrokeColor(borders)
+            ctx.setLineWidth(0.5)
+            ctx.setLineJoin(.round)
+            for (i, shape) in regionShapes.enumerated() where regionColors[regionIds[i]] != nil {
+                ctx.addPath(shape.path)
+                ctx.strokePath()
+            }
         }
 
         return ctx.makeImage()

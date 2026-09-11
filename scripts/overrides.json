@@ -1,0 +1,82 @@
+{
+  "countries": {
+    "en": {
+      "IS": {"pct": 86, "status": null},
+      "SE": {"pct": 86, "status": null},
+      "NO": {"pct": 90, "status": null},
+      "DK": {"pct": 86, "status": null},
+      "FI": {"pct": 70, "status": null}
+    },
+    "ru": {
+      "KZ": {"pct": 84, "status": "de_facto_official"},
+      "KG": {"pct": 49, "status": null},
+      "UZ": {"pct": 30, "status": null},
+      "TJ": {"pct": 28, "status": null},
+      "TM": {"pct": 18, "status": null}
+    }
+  },
+  "regions": {
+    "de": {
+      "CH-ZH": {"pct": 85, "status": null}, "CH-BE": {"pct": 84, "status": null},
+      "CH-LU": {"pct": 88, "status": null}, "CH-UR": {"pct": 92, "status": null},
+      "CH-SZ": {"pct": 89, "status": null}, "CH-OW": {"pct": 90, "status": null},
+      "CH-NW": {"pct": 90, "status": null}, "CH-GL": {"pct": 85, "status": null},
+      "CH-ZG": {"pct": 87, "status": null}, "CH-SO": {"pct": 88, "status": null},
+      "CH-BS": {"pct": 80, "status": null}, "CH-BL": {"pct": 85, "status": null},
+      "CH-SH": {"pct": 90, "status": null}, "CH-AR": {"pct": 90, "status": null},
+      "CH-AI": {"pct": 91, "status": null}, "CH-SG": {"pct": 87, "status": null},
+      "CH-AG": {"pct": 87, "status": null}, "CH-TG": {"pct": 88, "status": null},
+      "CH-GR": {"pct": 68, "status": null}
+    },
+    "fr": {
+      "CH-VD": {"pct": 90, "status": null}, "CH-NE": {"pct": 88, "status": null},
+      "CH-GE": {"pct": 82, "status": null}, "CH-JU": {"pct": 90, "status": null},
+      "CH-FR": {"pct": 65, "status": null}, "CH-VS": {"pct": 60, "status": null},
+      "CA-QC": {"pct": 95, "status": "official"}, "CA-NB": {"pct": 32, "status": "official"},
+      "BE-WHT": {"pct": 85, "status": "official"}, "BE-WNA": {"pct": 85, "status": "official"},
+      "BE-WLX": {"pct": 85, "status": "official"}, "BE-WLG": {"pct": 85, "status": "official"},
+      "BE-WBR": {"pct": 85, "status": "official"}, "BE-BRU": {"pct": 80, "status": "official"}
+    },
+    "it": {
+      "CH-TI": {"pct": 85, "status": null}
+    },
+    "rm": {
+      "CH-GR": {"pct": 15, "status": "official_regional"}
+    },
+    "nl": {
+      "BE-VWV": {"pct": 95, "status": "official"}, "BE-VOV": {"pct": 95, "status": "official"},
+      "BE-VAN": {"pct": 95, "status": "official"}, "BE-VLI": {"pct": 95, "status": "official"},
+      "BE-VBR": {"pct": 95, "status": "official"}, "BE-BRU": {"pct": 20, "status": "official"}
+    },
+    "ca": {
+      "ES-B": {"pct": 80, "status": "official_regional"}, "ES-GI": {"pct": 85, "status": "official_regional"},
+      "ES-L": {"pct": 80, "status": "official_regional"}, "ES-T": {"pct": 80, "status": "official_regional"},
+      "ES-CS": {"pct": 50, "status": "official_regional"}, "ES-V": {"pct": 50, "status": "official_regional"},
+      "ES-A": {"pct": 45, "status": "official_regional"}, "ES-PM": {"pct": 75, "status": "official_regional"}
+    },
+    "eu": {
+      "ES-VI": {"pct": 20, "status": "official_regional"}, "ES-BI": {"pct": 30, "status": "official_regional"},
+      "ES-SS": {"pct": 50, "status": "official_regional"}
+    },
+    "gl": {
+      "ES-C": {"pct": 85, "status": "official_regional"}, "ES-LU": {"pct": 90, "status": "official_regional"},
+      "ES-OR": {"pct": 90, "status": "official_regional"}, "ES-PO": {"pct": 85, "status": "official_regional"}
+    },
+    "ta": {"IN-TN": {"pct": 90, "status": "official_regional"}},
+    "bn": {"IN-WB": {"pct": 90, "status": "official_regional"}},
+    "pa": {"IN-PB": {"pct": 90, "status": "official_regional"}},
+    "ml": {"IN-KL": {"pct": 95, "status": "official_regional"}},
+    "mr": {"IN-MH": {"pct": 70, "status": "official_regional"}},
+    "kn": {"IN-KA": {"pct": 65, "status": "official_regional"}},
+    "gu": {"IN-GJ": {"pct": 85, "status": "official_regional"}},
+    "or": {"IN-OR": {"pct": 80, "status": "official_regional"}},
+    "as": {"IN-AS": {"pct": 50, "status": "official_regional"}},
+    "te": {"IN-TG": {"pct": 75, "status": "official_regional"}},
+    "es": {
+      "US-TX": {"pct": 29, "status": null}, "US-CA": {"pct": 28, "status": null},
+      "US-NM": {"pct": 30, "status": null}, "US-AZ": {"pct": 20, "status": null},
+      "US-FL": {"pct": 21, "status": null}, "US-NV": {"pct": 20, "status": null},
+      "US-CO": {"pct": 14, "status": null}, "US-NY": {"pct": 14, "status": null}
+    }
+  }
+}

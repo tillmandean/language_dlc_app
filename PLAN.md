@@ -1147,6 +1147,41 @@ threshold (10/25/50/75%), show a brief "achievement" toast. That is the DLC meta
 
 ## Phase 10 — Stretch goals (only after 0–9 are done)
 
+**Implemented (2026-09-11):** items 1–4 below (learning goals, `overrides.json`, share card,
+sub-national regions). Widget and iPad/visionOS are not done. Notes for picking this back up:
+
+- **Sub-national regions are visual only.** They shade on top of the country fill but are not
+  in the pick map — tapping a region resolves to its country, same as before. This kept the tap
+  pipeline, pick-map index encoding, and `CountryDetailSheet` untouched; giving regions their own
+  detail sheet is a natural follow-up but wasn't done here.
+- **Curated region list (72 ISO 3166-2 ids)** lives as `REGION_IDS` in `scripts/build_data.py`,
+  sourced from Natural Earth's **10m** admin-1 export — the 50m one only covers 9 large
+  countries and is missing Switzerland, Belgium and Spain entirely. Belgium and Spain are
+  modeled by Natural Earth at the *province* level, not by region/autonomous-community, so
+  those two list every province in the relevant language group rather than one shape per region
+  (e.g. all four Catalan-speaking Spanish provinces share one override value).
+- **`scripts/overrides.json`** is a hand-curated pipeline input (not fetched, not generated) with
+  two top-level keys, `"countries"` (Phase 10.2 gaps like Nordic English, Central Asian Russian —
+  a curated entry replaces CLDR's outright) and `"regions"` (Phase 10.4's 72 curated
+  language/region percentages — merged into each language's new `regions` map in
+  `languages.json`, parallel to `territories` but **not** counted toward `speakers`, since a
+  region's population is already counted at the country level).
+- **`CoverageEngine.coverage(for:in:)` and the new `regionCoverage(for:in:)`** share one private
+  `aggregate(selected:store:presences:)` — same union-of-probabilities math, parameterized over
+  whether it reads a language's `territories` or `regions` map. Region ids never collide with
+  `store.territories` keys, so `stats(_:in:)` naturally skips them without any special-casing.
+- **Learning goals is a straight brute-force scan** (`CoverageEngine.learningGoals`): for every
+  unselected language, compute world coverage with it added and rank by the gain. ~500 languages
+  × a coverage-and-stats pass each is fine on a background `Task.detached`, matching the
+  rasterizer's existing off-main-thread pattern; not worth memoizing at this app's data size.
+- The picker's "Learn next" section sits **below** "Selected", not above it — it went above
+  first, and broke the picker's "deselect without scrolling" guarantee (and the
+  `testTogglingLanguageUpdatesTheMap` UI test, which the pinned-top design exists for). Keep it
+  below if the section list changes again. Suggestion rows carry an explicit
+  `.accessibilityIdentifier(language.displayName)` distinct from their descriptive
+  `.accessibilityLabel`, so `app.buttons["Spanish"]`-style lookups keep working no matter which
+  section a language currently renders in.
+
 Ranked by value per unit of work:
 
 1. **Sub-national regions.** Add Natural Earth `ne_50m_admin_1_states_provinces` for a curated

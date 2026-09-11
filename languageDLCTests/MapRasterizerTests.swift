@@ -67,6 +67,30 @@ struct MapRasterizerTests {
         #expect(brazil.r < 80)
     }
 
+    /// Phase 10.4: a curated region drawn with its own color must not bleed into the rest of its
+    /// country, and a region left out of `regionColors` must fall through to the country's fill.
+    @Test func curatedRegionColorsOnlyItsOwnArea() {
+        let store = DataStore.shared
+        let r = MapRasterizer(countries: store.countries, regions: store.regions,
+                              width: 2048, height: 1024)
+
+        let switzerlandColor = Palette.fill(hue: 0.3, coverage: 1.0)
+        let genevaColor = Palette.fill(hue: 0.9, coverage: 1.0)
+        let image = r.renderTexture(colors: ["CH": switzerlandColor], ocean: Palette.ocean,
+                                    lockedLand: Palette.lockedLand, borders: Palette.borders,
+                                    regionColors: ["CH-GE": genevaColor])!
+        let data = image.dataProvider!.data! as Data
+        func pixel(lon: Double, lat: Double) -> (r: UInt8, g: UInt8, b: UInt8) {
+            let x = Int((lon + 180) / 360 * Double(image.width))
+            let y = Int((90 - lat) / 180 * Double(image.height))
+            let o = y * image.bytesPerRow + x * 4
+            return (data[o], data[o + 1], data[o + 2])
+        }
+        let geneva = pixel(lon: 6.14, lat: 46.30)     // canton interior, away from the border
+        let zurich = pixel(lon: 8.55, lat: 47.40)     // elsewhere in Switzerland, no override
+        #expect(geneva.r != zurich.r || geneva.g != zurich.g || geneva.b != zurich.b)
+    }
+
     @Test func oceanReturnsNil() {
         let r = MapRasterizer.shared
         #expect(territory(r, lon: -30.0, lat: 30.0) == nil)      // mid-Atlantic

@@ -22,6 +22,20 @@ enum CoverageEngine {
     /// Union of independent probabilities: 1 - Π(1 - p).
     /// Two languages at 60% and 50% in one country reach 80%, not 110%.
     static func coverage(for selected: [String], in store: DataStore) -> [String: CountryCoverage] {
+        aggregate(selected: selected, store: store) { $0.territories }
+    }
+
+    /// Same union math as `coverage(for:in:)`, but over each language's curated sub-national
+    /// presence (Phase 10.4) instead of its country-level one. Keyed by region id, e.g. "ES-CT" —
+    /// these ids never collide with `store.territories`, so `stats(_:in:)` naturally ignores them
+    /// rather than double-counting a region's people on top of its country.
+    static func regionCoverage(for selected: [String], in store: DataStore) -> [String: CountryCoverage] {
+        aggregate(selected: selected, store: store) { $0.regions ?? [:] }
+    }
+
+    private static func aggregate(selected: [String], store: DataStore,
+                                  presences: (Language) -> [String: LanguagePresence])
+        -> [String: CountryCoverage] {
         var result: [String: CountryCoverage] = [:]
         guard !selected.isEmpty else { return result }
 
@@ -31,7 +45,7 @@ enum CoverageEngine {
 
         for code in selected {
             guard let lang = store.languagesByCode[code] else { continue }
-            for (terr, presence) in lang.territories {
+            for (terr, presence) in presences(lang) {
                 let p = min(max(presence.pct / 100.0, 0), 1)
                 notReached[terr] = (notReached[terr] ?? 1.0) * (1.0 - p)
                 if p > (dominant[terr]?.pct ?? -1) { dominant[terr] = (code, p) }
@@ -63,6 +77,22 @@ enum CoverageEngine {
         return WorldStats(peopleReached: reached, worldPopulation: world,
                           countriesMajority: majority, countriesAny: any,
                           countriesOfficial: official)
+    }
+
+    /// Ranks every unselected language by how much world coverage it would add on top of the
+    /// current selection — "learn this next" — instead of by raw speaker count.
+    static func learningGoals(selected: [String], in store: DataStore, limit: Int = 5)
+        -> [(language: Language, gain: Double)] {
+        let baseline = stats(coverage(for: selected, in: store), in: store).fraction
+        let selectedSet = Set(selected)
+        var results: [(Language, Double)] = []
+        for language in store.languages where !selectedSet.contains(language.code) {
+            let withAdded = stats(coverage(for: selected + [language.code], in: store), in: store).fraction
+            let gain = withAdded - baseline
+            if gain > 0 { results.append((language, gain)) }
+        }
+        results.sort { $0.1 > $1.1 }
+        return Array(results.prefix(limit))
     }
 
     private static func rank(_ s: OfficialStatus?) -> Int {

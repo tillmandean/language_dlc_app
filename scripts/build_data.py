@@ -13,9 +13,40 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 CACHE = os.path.join(HERE, ".cache")
 OUT = os.path.join(ROOT, "languageDLC", "Resources")
+OVERRIDES_PATH = os.path.join(HERE, "overrides.json")
 
 GEO_URL = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson"
 CLDR_URL = "https://raw.githubusercontent.com/unicode-org/cldr/main/common/supplemental/supplementalData.xml"
+# Admin-1 (state/province) boundaries. The 50m export only carries a handful of large
+# countries — Switzerland, Belgium and Spain are missing from it entirely — so this uses the
+# 10m export instead, just for the curated subset of regions below.
+ADMIN1_URL = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_1_states_provinces.geojson"
+
+# Curated sub-national regions with a genuinely distinct language story (Phase 10.4). Natural
+# Earth models Belgium and Spain at the province level, not by linguistic region/autonomous
+# community, so those two countries list every province in the relevant group (e.g. all five
+# Catalan-speaking Spanish provinces) rather than one shape per region.
+REGION_IDS = {
+    # Switzerland: all 26 cantons.
+    "CH-ZH", "CH-BE", "CH-LU", "CH-UR", "CH-SZ", "CH-OW", "CH-NW", "CH-GL", "CH-ZG", "CH-FR",
+    "CH-SO", "CH-BS", "CH-BL", "CH-SH", "CH-AR", "CH-AI", "CH-SG", "CH-GR", "CH-AG", "CH-TG",
+    "CH-TI", "CH-VD", "CH-VS", "CH-NE", "CH-GE", "CH-JU",
+    # Belgium: every province, grouped by language in overrides.json.
+    "BE-VWV", "BE-VOV", "BE-VAN", "BE-VLI", "BE-VBR", "BE-WHT", "BE-WNA", "BE-WLX", "BE-WLG",
+    "BE-WBR", "BE-BRU",
+    # Spain: provinces of the five autonomous communities with a co-official regional language.
+    "ES-B", "ES-GI", "ES-L", "ES-T",              # Cataluña (Catalan)
+    "ES-VI", "ES-BI", "ES-SS",                    # País Vasco (Basque)
+    "ES-C", "ES-LU", "ES-OR", "ES-PO",             # Galicia (Galician)
+    "ES-CS", "ES-V", "ES-A",                      # Valenciana (Catalan/Valencian)
+    "ES-PM",                                      # Islas Baleares (Catalan)
+    # Canada.
+    "CA-QC", "CA-NB",
+    # India: major regional-language states.
+    "IN-TN", "IN-WB", "IN-PB", "IN-KL", "IN-MH", "IN-KA", "IN-GJ", "IN-OR", "IN-AS", "IN-TG",
+    # United States: notable Spanish-at-home share.
+    "US-TX", "US-CA", "US-NM", "US-AZ", "US-FL", "US-NV", "US-CO", "US-NY",
+}
 
 # Rank used both when collapsing duplicate script/region subtags for one
 # language in one territory, and when picking the "best" status a selected
@@ -172,23 +203,108 @@ def build_geometry(geo_path):
     return out
 
 
-def assemble_languages(langs, territories):
+def build_regions(geo_path):
+    """Same shape as build_geometry's output plus a `country` field, filtered to REGION_IDS."""
+    data = json.load(open(geo_path))
+    out = []
+    found = set()
+    for feat in data["features"]:
+        props = feat["properties"]
+        region_id = props.get("iso_3166_2")
+        if not region_id or region_id not in REGION_IDS or region_id in found:
+            continue
+
+        rings = _flatten_rings(feat["geometry"])
+        if not rings:
+            continue
+
+        label_lon = props.get("longitude")
+        label_lat = props.get("latitude")
+        if label_lon is None or label_lat is None:
+            label_lon, label_lat = _bbox_centroid(rings)
+
+        found.add(region_id)
+        out.append({
+            "id": region_id,
+            "country": region_id.split("-")[0],
+            "name": props.get("name") or region_id,
+            "labelLon": round(float(label_lon), 2),
+            "labelLat": round(float(label_lat), 2),
+            "rings": rings,
+        })
+
+    missing = REGION_IDS - found
+    if missing:
+        print("warning: curated region ids not found in admin-1 data:", sorted(missing))
+    return out
+
+
+def load_overrides():
+    """Hand-curated pipeline input at scripts/overrides.json — not fetched, not generated.
+    Tolerates a missing file so the pipeline still runs before it exists."""
+    if not os.path.exists(OVERRIDES_PATH):
+        return {"countries": {}, "regions": {}}
+    with open(OVERRIDES_PATH) as f:
+        data = json.load(f)
+    return {"countries": data.get("countries", {}), "regions": data.get("regions", {})}
+
+
+def apply_country_overrides(langs, territories, country_overrides):
+    """A curated entry replaces whatever CLDR had for that language/territory pair outright —
+    these exist specifically to correct or fill a known CLDR gap. Only applied to territories
+    with known population; returns the count of entries applied."""
+    applied = 0
+    for lang_code, terr_map in country_overrides.items():
+        for terr_code, entry in terr_map.items():
+            if terr_code not in territories:
+                continue
+            langs.setdefault(lang_code, {})[terr_code] = {
+                "pct": float(entry["pct"]),
+                "status": entry.get("status"),
+            }
+            applied += 1
+    return applied
+
+
+def resolve_region_overrides(region_overrides, region_ids):
+    """Drops any curated region-language entry whose region id has no geometry (e.g. a curated
+    id Natural Earth doesn't carry under that exact code). lang -> {region_id: {pct, status}}."""
+    resolved = {}
+    for lang_code, region_map in region_overrides.items():
+        kept = {rid: entry for rid, entry in region_map.items() if rid in region_ids}
+        if kept:
+            resolved[lang_code] = kept
+    return resolved
+
+
+def assemble_languages(langs, territories, region_langs=None):
+    region_langs = region_langs or {}
     result = []
-    for code, terr_map in langs.items():
+    for code in set(langs) | set(region_langs):
+        terr_map = langs.get(code, {})
         speakers = 0
         territories_out = {}
         for terr, entry in terr_map.items():
             pop = territories.get(terr, {}).get("population", 0)
             speakers += int(pop * entry["pct"] / 100.0)
             territories_out[terr] = {"pct": entry["pct"], "status": entry["status"]}
-        if not territories_out:
+        regions_out = {
+            rid: {"pct": float(entry["pct"]), "status": entry.get("status")}
+            for rid, entry in region_langs.get(code, {}).items()
+        }
+        # Region shares are a subset of a country's population already counted above — they
+        # don't add to `speakers`, or a regional language would double-count toward it.
+        if not territories_out and not regions_out:
             continue
-        result.append({
+        entry = {
             "code": code,
             "name": code,  # Swift resolves a localized display name at runtime via Locale
             "speakers": speakers,
             "territories": territories_out,
-        })
+        }
+        if regions_out:
+            entry["regions"] = regions_out
+        result.append(entry)
     result.sort(key=lambda l: l["speakers"], reverse=True)
     return result
 
@@ -199,13 +315,18 @@ def write(path, obj):
     print("wrote %s (%.2f MB)" % (path, os.path.getsize(path) / 1e6))
 
 
-def report(territories, langs, countries, languages):
+def report(territories, langs, countries, languages, overrides_applied=0, regions=None):
+    regions = regions or []
     world_pop = sum(t["population"] for t in territories.values())
     geo_ids = {c["id"] for c in countries}
     print()
     print("=== self-check ===")
     print("territories: %d          countries with geometry: %d" % (len(territories), len(countries)))
     print("languages:   %d          world population sum: %.2fB" % (len(languages), world_pop / 1e9))
+    print("country-level overrides applied: %d" % overrides_applied)
+    print("curated regions with geometry: %d / %d" % (len(regions), len(REGION_IDS)))
+    with_regions = sum(1 for l in languages if l.get("regions"))
+    print("languages with region-level data: %d" % with_regions)
     no_geo = [c for c in territories if c not in geo_ids]
     print("territories in CLDR with no geometry match: %d" % len(no_geo))
     for code in ("es", "en", "zh", "fr", "pt"):
@@ -224,9 +345,11 @@ def report(territories, langs, countries, languages):
 def main():
     geo_path = fetch(GEO_URL, "countries.geojson")
     cldr_path = fetch(CLDR_URL, "cldr.xml")
+    admin1_path = fetch(ADMIN1_URL, "admin1.geojson")
 
     territories, langs = build_language_data(cldr_path)
     countries = build_geometry(geo_path)
+    regions = build_regions(admin1_path)
 
     # Attach Natural Earth names to the territory table; drop CLDR
     # territories we have no polygon for (small dependencies, mostly).
@@ -235,14 +358,20 @@ def main():
             territories[c["id"]]["name"] = c["name"]
     territories = {k: v for k, v in territories.items() if "name" in v}
 
-    languages = assemble_languages(langs, territories)
+    overrides = load_overrides()
+    overrides_applied = apply_country_overrides(langs, territories, overrides["countries"])
+    region_ids = {r["id"] for r in regions}
+    region_langs = resolve_region_overrides(overrides["regions"], region_ids)
+
+    languages = assemble_languages(langs, territories, region_langs)
 
     os.makedirs(OUT, exist_ok=True)
     write(os.path.join(OUT, "territories.json"), {"version": 1, "territories": territories})
     write(os.path.join(OUT, "languages.json"), {"version": 1, "languages": languages})
     write(os.path.join(OUT, "geometry.json"), {"version": 1, "countries": countries})
+    write(os.path.join(OUT, "regions.json"), {"version": 1, "regions": regions})
 
-    report(territories, langs, countries, languages)
+    report(territories, langs, countries, languages, overrides_applied, regions)
 
 
 if __name__ == "__main__":

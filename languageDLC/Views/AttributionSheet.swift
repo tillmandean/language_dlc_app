@@ -11,7 +11,9 @@ struct AttributionSheet: View {
                     Language percentages and territory populations come from the Unicode CLDR \
                     supplemental data. Figures are approximate: they include second-language \
                     speakers, are periodically revised by Unicode's contributors, and can lag \
-                    real-world change.
+                    real-world change. A small number of country-level figures — English \
+                    comprehension in the Nordics, Russian in Central Asia — are hand-corrected \
+                    estimates for known gaps in that dataset.
                     """)
                     Text("Licensed under the Unicode License.")
                         .font(.caption)
@@ -19,6 +21,12 @@ struct AttributionSheet: View {
                 }
                 Section("Map data") {
                     Text("Country outlines come from Natural Earth.")
+                    Text("""
+                    Shaded sub-national regions (Swiss cantons, Belgian and Spanish provinces, \
+                    Quebec, several Indian and US states) use Natural Earth boundaries with \
+                    hand-curated, approximate language percentages — no authoritative \
+                    sub-national source exists at this resolution.
+                    """)
                     Text("Natural Earth data is in the public domain.")
                         .font(.caption)
                         .foregroundStyle(.secondary)

@@ -57,6 +57,61 @@ struct CoverageEngineTests {
         #expect(stats.fraction < 0.50)
     }
 
+    @Test func learningGoalsRanksHigherOverlapFirstAndExcludesSelected() {
+        let store = makeSyntheticStore(
+            languages: [
+                ("A", ["XX": (pct: 90.0, status: nil), "YY": (pct: 90.0, status: nil)]),
+                ("B", ["XX": (pct: 10.0, status: nil)]),
+                ("C", ["XX": (pct: 90.0, status: nil)]),
+            ],
+            territories: ["XX": 1_000_000, "YY": 1_000_000])
+
+        let goals = CoverageEngine.learningGoals(selected: [], in: store)
+        #expect(goals.map(\.language.code) == ["A", "C", "B"])
+
+        let afterC = CoverageEngine.learningGoals(selected: ["C"], in: store)
+        #expect(!afterC.map(\.language.code).contains("C"))
+        // B barely overlaps with C (both only touch XX, C already covers it), A still gains YY.
+        #expect(afterC.first?.language.code == "A")
+    }
+
+    @Test func regionCoverageUsesUnionMathAndNeverLeaksIntoWorldStats() {
+        let store = makeSyntheticStore(
+            languages: [
+                ("A", territories: ["XX": (pct: 60.0, status: nil)],
+                      regions: ["XX-REG": (pct: 60.0, status: nil)]),
+                ("B", territories: [:], regions: ["XX-REG": (pct: 50.0, status: nil)]),
+            ],
+            territories: ["XX": 1_000_000])
+
+        let regionCoverage = CoverageEngine.regionCoverage(for: ["A", "B"], in: store)
+        let reg = regionCoverage["XX-REG"]
+        #expect(reg != nil)
+        #expect(abs((reg?.coverage ?? -1) - 0.8) < 1e-9)
+
+        // "XX-REG" isn't a territory key, so it must never contribute to world population stats
+        // — otherwise a region's people would be double-counted on top of their country.
+        let stats = CoverageEngine.stats(regionCoverage, in: store)
+        #expect(stats.peopleReached == 0)
+        #expect(stats.countriesAny == 0)
+    }
+
+    /// Builds a minimal in-memory DataStore via its test-only initializer.
+    private func makeSyntheticStore(
+        languages: [(code: String, territories: [String: (pct: Double, status: OfficialStatus?)],
+                    regions: [String: (pct: Double, status: OfficialStatus?)])],
+        territories: [String: Int]
+    ) -> DataStore {
+        let langs = languages.map { entry in
+            Language(code: entry.code, name: entry.code, speakers: 0,
+                      territories: entry.territories.mapValues { LanguagePresence(pct: $0.pct, status: $0.status) },
+                      regions: entry.regions.isEmpty ? nil
+                          : entry.regions.mapValues { LanguagePresence(pct: $0.pct, status: $0.status) })
+        }
+        let terrs = territories.mapValues { Territory(name: "", population: $0) }
+        return DataStore(territories: terrs, languages: langs, countries: [])
+    }
+
     /// Builds a minimal in-memory DataStore via its test-only initializer.
     private func makeSyntheticStore(
         languages: [(code: String, territories: [String: (pct: Double, status: OfficialStatus?)])],

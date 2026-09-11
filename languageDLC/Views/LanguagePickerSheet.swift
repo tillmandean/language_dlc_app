@@ -8,6 +8,7 @@ struct LanguagePickerSheet: View {
     @State private var query = ""
     @State private var showRare = false
     @State private var showLimitAlert = false
+    @State private var suggestions: [(code: String, gain: Double)] = []
 
     private let store = DataStore.shared
     private let rareThreshold = 1_000_000
@@ -15,9 +16,18 @@ struct LanguagePickerSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                // "Selected" stays first so deselecting never requires scrolling past
+                // "Learn next" — the same reachability guarantee the pinned section existed for.
                 if !selectedLanguages.isEmpty {
                     Section("Selected") {
                         ForEach(selectedLanguages) { row(for: $0) }
+                    }
+                }
+                if !suggestedLanguages.isEmpty {
+                    Section("Learn next") {
+                        ForEach(suggestedLanguages, id: \.language.code) { entry in
+                            suggestionRow(entry.language, gain: entry.gain)
+                        }
                     }
                 }
                 Section {
@@ -30,6 +40,14 @@ struct LanguagePickerSheet: View {
             }
             .listStyle(.insetGrouped)
             .searchable(text: $query, prompt: "Search languages")
+            .task(id: state.selected) {
+                let selected = state.selected
+                let store = store
+                let ranked = await Task.detached(priority: .userInitiated) {
+                    CoverageEngine.learningGoals(selected: selected, in: store)
+                }.value
+                suggestions = ranked.map { (code: $0.language.code, gain: $0.gain) }
+            }
             .navigationTitle("Languages")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -89,6 +107,30 @@ struct LanguagePickerSheet: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
+    private func suggestionRow(_ language: Language, gain: Double) -> some View {
+        Button {
+            toggle(language)
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(language.displayName)
+                        .foregroundStyle(.primary)
+                    Text("\(language.territories.count) countries · \(formatted(language.speakers)) speakers")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text("+\(String(format: "%.1f", gain * 100))%")
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.green)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(language.displayName)
+        .accessibilityLabel("\(language.displayName), adds \(String(format: "%.1f", gain * 100)) percent world coverage")
+    }
+
     private func toggle(_ language: Language) {
         guard state.selected.contains(language.code) || state.selected.count < AppState.maxSelected
         else {
@@ -99,6 +141,15 @@ struct LanguagePickerSheet: View {
     }
 
     // MARK: - Data
+
+    /// Top candidates by marginal world-coverage gain, hidden once the palette is full — nothing
+    /// more could be added anyway.
+    private var suggestedLanguages: [(language: Language, gain: Double)] {
+        guard state.selected.count < AppState.maxSelected else { return [] }
+        return suggestions.compactMap { entry in
+            store.languagesByCode[entry.code].map { ($0, entry.gain) }
+        }
+    }
 
     /// Selected languages, in selection order (matches their globe color assignment).
     private var selectedLanguages: [Language] {

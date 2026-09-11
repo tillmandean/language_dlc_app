@@ -37,6 +37,11 @@ struct Language: Codable, Identifiable, Hashable {
     let name: String
     let speakers: Int
     let territories: [String: LanguagePresence]
+    /// Curated sub-national presence, keyed by ISO 3166-2 region id (e.g. "ES-CT"). Absent for
+    /// almost every language — there is no authoritative sub-national source, so this only
+    /// exists where PLAN.md Phase 10.4 hand-curated it. `nil` means "no curated regions," same
+    /// convention as `nativeName`.
+    var regions: [String: LanguagePresence]? = nil
 
     var id: String { code }
 
@@ -59,4 +64,15 @@ struct CountryGeometry: Codable, Identifiable {
     let labelLon: Double
     let labelLat: Double
     let rings: [[Double]]        // flat [lon, lat, lon, lat, ...]
+}
+
+/// A curated sub-national region (e.g. a Swiss canton), drawn on top of its country's fill.
+/// Phase 10.4 — see PLAN.md for the curated list and why it's province/canton/state-level.
+struct RegionGeometry: Codable, Identifiable {
+    let id: String                // ISO 3166-2, e.g. "ES-CT"
+    let country: String           // the 2-letter prefix of `id`
+    let name: String
+    let labelLon: Double
+    let labelLat: Double
+    let rings: [[Double]]
 }

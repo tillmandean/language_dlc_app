@@ -17,6 +17,8 @@ struct ContentView: View {
     @State private var showPicker = false
     @State private var showList = false
     @State private var showAttribution = false
+    @State private var captureGlobe: (() -> UIImage?)?
+    @State private var shareImage: UIImage?
 
     private let haptic = UIImpactFeedbackGenerator(style: .light)
 
@@ -27,11 +29,11 @@ struct ContentView: View {
             if showList {
                 CountryListView(state: state)
             } else {
-                GlobeView(texture: texture) { u, v in
+                GlobeView(texture: texture, onTap: { u, v in
                     let territory = MapRasterizer.shared.territory(atU: u, v: v)
                     state.focused = territory
                     if territory != nil { haptic.impactOccurred() }
-                }
+                }, captureHandler: $captureGlobe)
                 .ignoresSafeArea()
                 .accessibilityLabel(globeAccessibilityLabel)
 
@@ -56,8 +58,12 @@ struct ContentView: View {
         .sheet(isPresented: $showAttribution) {
             AttributionSheet()
         }
+        .sheet(isPresented: Binding(get: { shareImage != nil }, set: { if !$0 { shareImage = nil } })) {
+            if let shareImage { ActivityView(activityItems: [shareImage]) }
+        }
         .task(id: renderKey) {
             let colors = state.fillColors()
+            let regionColors = state.regionFillColors()
             let calibrating = showCalibration
             texture = await Task.detached(priority: .userInitiated) {
                 calibrating
@@ -65,7 +71,8 @@ struct ContentView: View {
                     : MapRasterizer.shared.renderTexture(colors: colors,
                                                          ocean: Palette.ocean,
                                                          lockedLand: Palette.lockedLand,
-                                                         borders: Palette.borders)
+                                                         borders: Palette.borders,
+                                                         regionColors: regionColors)
             }.value
         }
     }
@@ -104,6 +111,16 @@ struct ContentView: View {
                 .tint(.white)
                 .accessibilityLabel("Data & credits")
 
+                Button {
+                    shareGlobe()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+                .disabled(state.selected.isEmpty || texture == nil)
+                .accessibilityLabel("Share")
+
                 #if DEBUG
                 Button(showCalibration ? "Map" : "Calibrate") { showCalibration.toggle() }
                     .buttonStyle(.bordered)
@@ -111,6 +128,11 @@ struct ContentView: View {
                 #endif
             }
         }
+    }
+
+    private func shareGlobe() {
+        guard let globeImage = captureGlobe?() else { return }
+        shareImage = ShareCardRenderer.makeCard(globe: globeImage, state: state)
     }
 
     /// Re-render whenever the selection or the debug texture choice changes.

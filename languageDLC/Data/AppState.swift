@@ -8,6 +8,7 @@ final class AppState {
         didSet { persist(); recompute() }
     }
     private(set) var coverage: [String: CountryCoverage] = [:]
+    private(set) var regionCoverage: [String: CountryCoverage] = [:]
     private(set) var stats: WorldStats = WorldStats(peopleReached: 0, worldPopulation: 0,
                                                     countriesMajority: 0, countriesAny: 0,
                                                     countriesOfficial: 0)
@@ -43,8 +44,18 @@ final class AppState {
         }
     }
 
+    /// Same as `fillColors()` but for the curated sub-national regions (Phase 10.4). A region
+    /// with no entry here is left undrawn, so its country's own color underneath keeps showing.
+    func regionFillColors() -> [String: CGColor] {
+        regionCoverage.compactMapValues { c in
+            guard let dom = c.dominantLanguage else { return nil }
+            return Palette.fill(hue: hue(for: dom), coverage: c.coverage)
+        }
+    }
+
     private func recompute() {
         coverage = CoverageEngine.coverage(for: selected, in: store)
+        regionCoverage = CoverageEngine.regionCoverage(for: selected, in: store)
         stats = CoverageEngine.stats(coverage, in: store)
     }
     private func persist() { UserDefaults.standard.set(selected, forKey: key) }

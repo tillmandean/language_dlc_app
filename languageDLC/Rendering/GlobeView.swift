@@ -38,6 +38,9 @@ struct GlobeView: UIViewRepresentable {
     var texture: CGImage?
     /// Reports texture coordinates (u, v), each 0...1, already decoded through `GlobeProjection`.
     var onTap: (Double, Double) -> Void
+    /// Set once, in `makeUIView`, to a closure the caller can invoke to snapshot the globe as
+    /// currently rendered — used by the share card (Phase 10.3).
+    var captureHandler: Binding<(() -> UIImage?)?> = .constant(nil)
 
     /// Seconds for one idle revolution; cancelled the moment the user touches the globe.
     private static let spinDuration: TimeInterval = 90
@@ -71,6 +74,7 @@ struct GlobeView: UIViewRepresentable {
         context.coordinator.view = view
         context.coordinator.globe = globe
         context.coordinator.camera = built.camera
+        captureHandler.wrappedValue = { [weak view] in view?.snapshot() }
         return view
     }
 

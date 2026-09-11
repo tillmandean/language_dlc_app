@@ -27,6 +27,19 @@ struct DataStoreTests {
         #expect(DataStore.shared.countries.count >= 200)
     }
 
+    /// Phase 10.4's curated sub-national regions (Swiss cantons, Belgian provinces, Spanish
+    /// autonomous-community provinces, Quebec/New Brunswick, Indian states, US states).
+    @Test func regionGeometryCount() {
+        #expect(DataStore.shared.regions.count == 72)
+    }
+
+    @Test func catalanHasCuratedRegionData() throws {
+        let store = DataStore.shared
+        let ca = try #require(store.languagesByCode["ca"])
+        let regions = try #require(ca.regions)
+        #expect(regions["ES-B"] != nil)   // Barcelona, in Cataluña
+    }
+
     @Test func spanishCoversExpectedTerritories() throws {
         let store = DataStore.shared
         let es = try #require(store.languagesByCode["es"])
