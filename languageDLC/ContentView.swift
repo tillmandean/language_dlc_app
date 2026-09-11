@@ -2,32 +2,62 @@
 //  ContentView.swift
 //  languageDLC
 //
-//  Milestone A: a flat equirectangular map, to validate geometry, projection and coloring
-//  before any 3D work. Replaced by the globe in Phase 5.
+//  Milestone B: the map texture wrapped on a rotatable globe. The hard-coded language
+//  buttons and the tapped-country readout are temporary; Phases 6–8 replace them with the
+//  detail sheet, the picker and the HUD.
 //
 
 import SwiftUI
 
 struct ContentView: View {
     @State private var state = AppState()
-    @State private var texture: UIImage?
+    @State private var texture: CGImage?
+    @State private var showCalibration = false
 
     private let demoLanguages = ["es", "fr"]
 
     var body: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                Color.black
-                if let texture {
-                    Image(uiImage: texture)
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                } else {
-                    ProgressView()
-                }
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            GlobeView(texture: texture) { u, v in
+                state.focused = MapRasterizer.shared.territory(atU: u, v: v)
             }
-            .frame(maxWidth: .infinity)
+            .ignoresSafeArea()
+
+            if texture == nil {
+                ProgressView().tint(.white)
+            }
+
+            VStack {
+                Text(summary)
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                controls
+            }
+            .padding()
+        }
+        .task(id: renderKey) {
+            let colors = state.fillColors()
+            let calibrating = showCalibration
+            texture = await Task.detached(priority: .userInitiated) {
+                calibrating
+                    ? MapRasterizer.shared.renderCalibrationTexture()
+                    : MapRasterizer.shared.renderTexture(colors: colors,
+                                                         ocean: Palette.ocean,
+                                                         lockedLand: Palette.lockedLand,
+                                                         borders: Palette.borders)
+            }.value
+        }
+    }
+
+    private var controls: some View {
+        VStack(spacing: 12) {
+            Text(focusLabel)
+                .font(.headline)
+                .foregroundStyle(.white)
+                .accessibilityIdentifier("focusedTerritory")
 
             HStack(spacing: 12) {
                 ForEach(demoLanguages, id: \.self) { code in
@@ -38,23 +68,23 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(isOn ? .accentColor : .gray)
                 }
+                #if DEBUG
+                Button(showCalibration ? "Map" : "Calibrate") { showCalibration.toggle() }
+                    .buttonStyle(.bordered)
+                    .tint(.white)
+                #endif
             }
+        }
+    }
 
-            Text(summary)
-                .font(.footnote.monospacedDigit())
-                .foregroundStyle(.secondary)
-        }
-        .padding()
-        .task(id: state.selected) {
-            let colors = state.fillColors()
-            let image = await Task.detached(priority: .userInitiated) {
-                MapRasterizer.shared.renderTexture(colors: colors,
-                                                   ocean: Palette.ocean,
-                                                   lockedLand: Palette.lockedLand,
-                                                   borders: Palette.borders)
-            }.value
-            if let image { texture = UIImage(cgImage: image) }
-        }
+    /// Re-render whenever the selection or the debug texture choice changes.
+    private var renderKey: String {
+        state.selected.joined(separator: ",") + (showCalibration ? "|cal" : "")
+    }
+
+    private var focusLabel: String {
+        guard let code = state.focused else { return "Tap a country" }
+        return DataStore.shared.territories[code]?.name ?? code
     }
 
     private var summary: String {

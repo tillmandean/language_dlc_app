@@ -237,3 +237,37 @@ final class MapRasterizer {
                                    width: r * 2, height: r * 2))
     }
 }
+
+// MARK: - Calibration
+
+extension MapRasterizer {
+
+    /// A texture with no map on it, used once to pin down how `SCNSphere` orients its UVs
+    /// (§5.1). Red dot at (0°, 0°), green at (0°, 90°E), blue at (0°, 90°W), white bar across
+    /// the top 20 rows — so the bar marks the north pole and green sits east of red.
+    func renderCalibrationTexture() -> CGImage? {
+        guard let ctx = makeContext(width: width, height: height) else { return nil }
+        ctx.setFillColor(Palette.ocean)
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+        ctx.setFillColor(CGColor(colorSpace: Self.colorSpace, components: [1, 1, 1, 1])!)
+        ctx.fill(CGRect(x: 0, y: 0, width: CGFloat(width), height: 20))
+
+        func dot(lon: Double, lat: Double, _ components: [CGFloat]) {
+            ctx.setFillColor(CGColor(colorSpace: Self.colorSpace, components: components)!)
+            let c = point(lon: lon, lat: lat)
+            ctx.fillEllipse(in: CGRect(x: c.x - 40, y: c.y - 40, width: 80, height: 80))
+        }
+        dot(lon: 0, lat: 0, [1, 0, 0, 1])
+        dot(lon: 90, lat: 0, [0, 1, 0, 1])
+        dot(lon: -90, lat: 0, [0, 0, 1, 1])
+
+        return ctx.makeImage()
+    }
+
+    /// (lon, lat) in degrees -> texture pixel space, §4.1.
+    func point(lon: Double, lat: Double) -> CGPoint {
+        CGPoint(x: (CGFloat(lon) + 180) / 360 * CGFloat(width),
+                y: (90 - CGFloat(lat)) / 180 * CGFloat(height))
+    }
+}
