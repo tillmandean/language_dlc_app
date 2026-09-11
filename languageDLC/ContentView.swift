@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @State private var state = AppState()
@@ -15,15 +16,21 @@ struct ContentView: View {
     @State private var showCalibration = false
 
     private let demoLanguages = ["es", "fr"]
+    private let haptic = UIImpactFeedbackGenerator(style: .light)
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
             GlobeView(texture: texture) { u, v in
-                state.focused = MapRasterizer.shared.territory(atU: u, v: v)
+                let territory = MapRasterizer.shared.territory(atU: u, v: v)
+                state.focused = territory
+                if territory != nil { haptic.impactOccurred() }
             }
             .ignoresSafeArea()
+            .sheet(item: focusedTerritory) { entry in
+                CountryDetailSheet(code: entry.code, state: state)
+            }
 
             if texture == nil {
                 ProgressView().tint(.white)
@@ -85,6 +92,15 @@ struct ContentView: View {
     private var focusLabel: String {
         guard let code = state.focused else { return "Tap a country" }
         return DataStore.shared.territories[code]?.name ?? code
+    }
+
+    /// Bridges `AppState.focused` (a plain `String?`) to `.sheet(item:)`, which needs
+    /// an `Identifiable` binding.
+    private var focusedTerritory: Binding<FocusedTerritory?> {
+        Binding(
+            get: { state.focused.map(FocusedTerritory.init) },
+            set: { state.focused = $0?.code }
+        )
     }
 
     private var summary: String {

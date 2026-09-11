@@ -102,13 +102,21 @@ A phase is not done until the build command prints `** BUILD SUCCEEDED **`.
 
 ---
 
-### 0.5 Where things stand (updated 2026-09-10, end of Phase 5)
+### 0.5 Where things stand (updated 2026-09-11, end of Phase 6)
 
-**Resume at Phase 6.** Phases 0–5 are implemented and committed (`532e714`, `be2add3`,
-`55116fc`, `10d3765`, `2cfbb82`, `4ad2470`). Both commands in §0.3 pass on the iPhone 17
-simulator: the build prints `** BUILD SUCCEEDED **` and the full test suite — 26 unit tests
-plus 5 UI tests — is green. (A UI-test run occasionally fails to launch the xctrunner with
-`FBSOpenApplicationServiceErrorDomain`; it is a simulator flake, not the app. Re-run.)
+**Resume at Phase 7.** Phases 0–6 are implemented and committed (`532e714`, `be2add3`,
+`55116fc`, `10d3765`, `2cfbb82`, `4ad2470`, and Phase 6's commit). Both commands in §0.3 pass on
+the iPhone 17 simulator: the build prints `** BUILD SUCCEEDED **` and the full test suite — 26
+unit tests plus 5 UI tests — is green. (A UI-test run occasionally fails to launch the xctrunner
+with `FBSOpenApplicationServiceErrorDomain`, and `GlobeRenderingTests` occasionally reports a
+slow frame on a loaded simulator; both are simulator flakes, not the app. Re-run.)
+
+Phase 6 added `languageDLC/Views/CountryDetailSheet.swift` and its `FocusedTerritory` wrapper.
+`AppState.focused` stayed a plain `String?` — `ContentView` bridges it to `.sheet(item:)` with a
+local `Binding<FocusedTerritory?>` rather than changing `AppState`'s stored type, so the existing
+`focusedTerritory` accessibility label and `MapInteractionUITests` keep working unmodified. The
+temporary Spanish/French buttons are still in `ContentView`; Phase 7 replaces them with the real
+language picker.
 
 Facts established at runtime that Phases 6–9 depend on:
 
