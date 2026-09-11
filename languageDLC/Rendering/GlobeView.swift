@@ -74,7 +74,14 @@ struct GlobeView: UIViewRepresentable {
         context.coordinator.view = view
         context.coordinator.globe = globe
         context.coordinator.camera = built.camera
-        captureHandler.wrappedValue = { [weak view] in view?.snapshot() }
+        // Writing to the binding synchronously here mutates the parent's @State while SwiftUI
+        // is still in the middle of this same view update, which is undefined behavior and
+        // silently drops the write — the closure never lands, so `captureHandler` stays nil and
+        // the share button folds. Deferring to the next run loop turn keeps the write outside
+        // the update pass.
+        DispatchQueue.main.async {
+            captureHandler.wrappedValue = { [weak view] in view?.snapshot() }
+        }
         return view
     }
 
@@ -98,6 +105,11 @@ struct GlobeView: UIViewRepresentable {
         let camera = SCNNode()
         camera.camera = SCNCamera()
         camera.camera?.fieldOfView = 45
+        // SceneKit's default zNear (1 world unit) is farther than the closest allowed zoom
+        // (minCameraZ 1.6, against a radius-1 sphere — as near as 0.6 units away), so pinching
+        // all the way in clipped the near cap of the globe away, leaving the screen black. A
+        // near plane closer than the sphere itself fixes that at any zoom level.
+        camera.camera?.zNear = 0.05
         // On a portrait phone the default (vertical) reading of the field of view makes the
         // globe wider than the screen; measuring it across the width fits the sphere with a
         // margin at any aspect ratio.
@@ -162,8 +174,14 @@ struct GlobeView: UIViewRepresentable {
         /// same factor for both keeps a flick feel like a continuation of the drag that caused it.
         private static let rotationScale: Double = 0.005
         private static let maxPitch: Float = 80 * .pi / 180   // never flip over a pole
+        /// Within this many radians of the pole, dragging eases off instead of tracking the
+        /// finger 1:1 — the same "rubber band" a scroll view uses at its bounds. Below the
+        /// threshold (`maxPitch - softZone`) nothing changes from a plain clamp.
+        private static let softZone: Float = 20 * .pi / 180
+        private static let pitchThreshold: Float = maxPitch - softZone
 
-        private(set) var pitch: Float = 0    // rotation around X, exposed for the pitch-clamp test
+        private var rawPitch: Float = 0      // unclamped total vertical drag, before easing
+        private(set) var pitch: Float = 0    // rotation around X, eased near the pole; exposed for tests
         private(set) var yaw: Float = 0      // rotation around Y
 
         private var angularVelocityX: Double = 0   // rad/s, decaying after a flick
@@ -198,8 +216,23 @@ struct GlobeView: UIViewRepresentable {
 
         private func rotate(byYaw dYaw: Float, pitch dPitch: Float) {
             yaw += dYaw
-            pitch = min(max(pitch + dPitch, -Self.maxPitch), Self.maxPitch)
+            rawPitch += dPitch
+            pitch = Self.easedPitch(rawPitch)
             globe?.eulerAngles = SCNVector3(pitch, yaw, 0)
+        }
+
+        /// Linear up to `pitchThreshold`, then eases toward `maxPitch` with a `tanh` curve —
+        /// value and slope match at the seam, so there's no kink, and even a huge `raw` still
+        /// converges to exactly `maxPitch` (within float precision), matching the hard-clamp
+        /// contract `GlobeGestureTests` checks. Below the threshold this is the identity, so
+        /// ordinary drags feel exactly as before; only the last `softZone` degrees before a
+        /// pole get a soft stop instead of hitting a wall.
+        private static func easedPitch(_ raw: Float) -> Float {
+            let sign: Float = raw < 0 ? -1 : 1
+            let magnitude = abs(raw)
+            guard magnitude > pitchThreshold else { return raw }
+            let excess = magnitude - pitchThreshold
+            return sign * (pitchThreshold + softZone * tanh(excess / softZone))
         }
 
         private func startMomentum() {

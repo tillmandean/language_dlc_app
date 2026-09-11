@@ -28,6 +28,15 @@ struct ContentView: View {
 
             if showList {
                 CountryListView(state: state)
+
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        listToggleButton
+                    }
+                }
+                .padding()
             } else {
                 GlobeView(texture: texture, onTap: { u, v in
                     let territory = MapRasterizer.shared.territory(atU: u, v: v)
@@ -40,14 +49,14 @@ struct ContentView: View {
                 if texture == nil {
                     ProgressView().tint(.white)
                 }
-            }
 
-            VStack {
-                StatsHUD(state: state)
-                Spacer()
-                controls
+                VStack {
+                    StatsHUD(state: state)
+                    Spacer()
+                    controls
+                }
+                .padding()
             }
-            .padding()
         }
         .sheet(item: focusedTerritory) { entry in
             CountryDetailSheet(code: entry.code, state: state)
@@ -94,15 +103,7 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
                     .fixedSize()
 
-                    Button {
-                        showList.toggle()
-                    } label: {
-                        Image(systemName: showList ? "globe.americas.fill" : "list.bullet")
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.white)
-                    .accessibilityLabel(showList ? "Globe" : "List")
-                    .accessibilityHint("Switch to a VoiceOver-friendly list of countries")
+                    listToggleButton
 
                     Button {
                         showAttribution = true
@@ -133,6 +134,18 @@ struct ContentView: View {
                 .padding(.horizontal, 2)   // room for the focus ring/shadow at the scroll edges
             }
         }
+    }
+
+    private var listToggleButton: some View {
+        Button {
+            showList.toggle()
+        } label: {
+            Image(systemName: showList ? "globe.americas.fill" : "list.bullet")
+        }
+        .buttonStyle(.bordered)
+        .tint(.white)
+        .accessibilityLabel(showList ? "Globe" : "List")
+        .accessibilityHint("Switch to a VoiceOver-friendly list of countries")
     }
 
     private func shareGlobe() {
