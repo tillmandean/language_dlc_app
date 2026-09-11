@@ -102,6 +102,38 @@ A phase is not done until the build command prints `** BUILD SUCCEEDED **`.
 
 ---
 
+### 0.5 Where things stand (updated 2026-09-10, end of Phase 5)
+
+**Resume at Phase 6.** Phases 0–5 are implemented and committed (`532e714`, `be2add3`,
+`55116fc`, `10d3765`, `2cfbb82`, `4ad2470`). Both commands in §0.3 pass on the iPhone 17
+simulator: the build prints `** BUILD SUCCEEDED **` and the full test suite — 26 unit tests
+plus 5 UI tests — is green. (A UI-test run occasionally fails to launch the xctrunner with
+`FBSOpenApplicationServiceErrorDomain`; it is a simulator flake, not the app. Re-run.)
+
+Facts established at runtime that Phases 6–9 depend on:
+
+- **`GlobeProjection` is the identity.** `SCNSphere` unwraps to exactly the rasterizer's
+  equirectangular projection, so `flipV`, `mirrorU` and `uOffset` are all no-ops. This is
+  measured on every test run, not assumed — see §5.1.
+- **Taps go through `GlobeView.textureCoordinate(in:at:)`**, which already applies
+  `GlobeProjection.decode` and the seam-miss workaround below. Phase 9 replaces
+  `allowsCameraControl` with custom gestures — keep routing taps through that one function.
+- `GlobeView.makeScene()` builds the scene, sphere and camera in one place so the tests
+  calibrate against the geometry the app actually ships. Keep it that way.
+- `ContentView` still holds the temporary Spanish/French buttons and a tapped-country label
+  (accessibility identifier `focusedTerritory`, which `MapInteractionUITests` queries). Phases
+  6–8 replace these; keep or move the identifier if the UI test should keep passing.
+- `AppState.focused` is a `String?`. Phase 6's `.sheet(item:)` needs an `Identifiable` wrapper.
+- `MapRasterizer.renderCalibrationTexture()` and the DEBUG-only "Calibrate" button in
+  `ContentView` are the §5.1 debug path. Harmless to keep, fine to drop once the HUD lands.
+
+Files added in Phase 5: `languageDLC/Rendering/GlobeView.swift`,
+`languageDLCTests/GlobeProjectionTests.swift` (calibration + a frame-cost check).
+`languageDLCUITests/FlatMapUITests.swift` was renamed to `MapInteractionUITests.swift` and
+gained an end-to-end globe-tap test.
+
+---
+
 ## Phase 0 — Project prep
 
 **Goal:** clean folder structure, sane deployment target, app builds.
@@ -920,6 +952,31 @@ struct GlobeProjection {
 6. Verify by printing `territory(atU:v:)` for taps on five known places: Brazil, Australia,
    Japan, Egypt, Alaska. All five must be right before you move on.
 
+**Result (2026-09-10): all three corrections are no-ops.** `SCNSphere` carries texture
+coordinates identical to the rasterizer's projection — v = 0 at the north pole, u = 0 at 180°W
+rising eastward, seam at the back — so `flipV = false`, `mirrorU = false`, `uOffset = 0`.
+
+It is checked rather than trusted. `GlobeProjectionTests` reads the sphere's own UV geometry
+source and compares every vertex against the rasterizer's formula, renders a two-tone probe
+texture offscreen to prove the image's top lands on the north pole, hit-tests left/right and
+up/down for orientation, and runs the five named places of step 6 through the real path
+(sphere UV → screen point → SceneKit hit test → `decode` → pick map). If SceneKit ever changes
+its unwrapping, those tests fail instead of the map quietly going crooked.
+
+Two things the steps above do not warn about, both fixed in `GlobeView.swift`:
+
+- **SceneKit reports a miss for a ray landing exactly on a shared triangle edge**, and the
+  sphere's seam column runs straight down the middle of the view — so every tap on the exact
+  centre line did nothing. `textureCoordinate(in:at:)` retries half a point to the side.
+- **A 45° field of view is measured vertically by default**, which makes the globe wider than a
+  portrait phone (it was cut off at both edges). `camera.projectionDirection = .horizontal`
+  fits the sphere at any aspect ratio.
+
+Two notes on testing SceneKit offscreen, if you write more of these: hit testing reads
+*presentation* values, so a node's new transform does not take effect until something renders
+(`_ = view.snapshot()` is enough), and the suite is marked `.serialized` because concurrent
+`SCNView`s are unreliable.
+
 ### 5.2 Presentation
 
 - `scene.background.contents` = a dark gradient or star field `UIImage`. Black is fine for now.
@@ -927,11 +984,16 @@ struct GlobeProjection {
   `node.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 90)))`.
 
 ### Done when
-- [ ] A rotatable sphere shows the world map; continents are recognizable from every angle.
-- [ ] Toggling a language updates the sphere's texture without stutter.
-- [ ] The five calibration taps in §5.1 step 6 all return the correct country.
-- [ ] Frame rate stays at 60 fps while dragging (check the SceneKit statistics overlay via
-      `view.showsStatistics = true`, then turn it back off).
+- [x] A rotatable sphere shows the world map; continents are recognizable from every angle.
+      Verified in the simulator: screenshots 8 s apart show the Atlantic view rotating to the
+      Americas, with east to the right.
+- [x] Toggling a language updates the sphere's texture without stutter.
+      (`MapInteractionUITests.testTogglingLanguageUpdatesTheMap`.)
+- [x] The five calibration taps in §5.1 step 6 all return the correct country.
+- [x] Frame rate stays at 60 fps while dragging — **measured differently.** The statistics
+      overlay would not surface in a simulator screenshot, so `GlobeRenderingTests` renders 30
+      textured frames offscreen and asserts each costs well under 16.6 ms. It passes with room
+      to spare, but that is a simulator number; confirm on a device when one is at hand.
 
 ---
 
@@ -1069,6 +1131,9 @@ Ranked by value per unit of work:
 | English shows >30% of the world | CLDR script-subtag duplicates summed twice | §1.2 |
 | Toggling a language freezes the UI | Rasterizing on the main thread | §4.4 |
 | Faceted globe silhouette | `segmentCount` too low | Set to 96 |
+| Taps on the vertical centre line of the view do nothing | Ray landing exactly on the sphere's seam edge reads as a miss | Retry half a point to the side, §5.1 |
+| Globe is cut off at the left and right edges | `fieldOfView` is measured vertically by default | `camera.projectionDirection = .horizontal`, §5.1 |
+| A node's new transform does not affect hit testing | Hit tests read presentation values, which only a render syncs | Force a frame (`_ = view.snapshot()`) first |
 
 ## Appendix B — RealityKit fallback
 
