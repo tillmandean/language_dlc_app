@@ -39,9 +39,9 @@ struct ContentView: View {
                 .padding()
             } else {
                 GlobeView(texture: texture, onTap: { u, v in
-                    let territory = MapRasterizer.shared.territory(atU: u, v: v)
-                    state.focused = territory
-                    if territory != nil { haptic.impactOccurred() }
+                    let hit = MapRasterizer.shared.feature(atU: u, v: v)
+                    state.focused = hit
+                    if hit != nil { haptic.impactOccurred() }
                 }, captureHandler: $captureGlobe)
                 .ignoresSafeArea()
                 .accessibilityLabel(globeAccessibilityLabel)
@@ -58,8 +58,8 @@ struct ContentView: View {
                 .padding()
             }
         }
-        .sheet(item: focusedTerritory) { entry in
-            CountryDetailSheet(code: entry.code, state: state)
+        .sheet(item: focusedFeature) { feature in
+            CountryDetailSheet(feature: feature, state: state)
         }
         .sheet(isPresented: $showPicker) {
             LanguagePickerSheet(state: state)
@@ -166,17 +166,18 @@ struct ContentView: View {
     }
 
     private var focusLabel: String {
-        guard let code = state.focused else { return "Tap a country" }
-        return DataStore.shared.territories[code]?.name ?? code
+        let store = DataStore.shared
+        switch state.focused {
+        case nil:                     return "Tap a country"
+        case .country(let code):      return store.territories[code]?.name ?? code
+        case .region(let id, _):      return store.regionsById[id]?.name ?? id
+        }
     }
 
-    /// Bridges `AppState.focused` (a plain `String?`) to `.sheet(item:)`, which needs
-    /// an `Identifiable` binding.
-    private var focusedTerritory: Binding<FocusedTerritory?> {
-        Binding(
-            get: { state.focused.map(FocusedTerritory.init) },
-            set: { state.focused = $0?.code }
-        )
+    /// `.sheet(item:)` needs a binding; `AppState` is `@Observable`, not a `Binding` source.
+    /// `MapFeature` is `Identifiable`, so nothing else has to be wrapped.
+    private var focusedFeature: Binding<MapFeature?> {
+        Binding(get: { state.focused }, set: { state.focused = $0 })
     }
 
     /// VoiceOver can't hit-test the sphere, so its label states the numbers instead and points

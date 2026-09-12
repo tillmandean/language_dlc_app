@@ -1,14 +1,13 @@
 import SwiftUI
 
-/// Wraps a territory code so `AppState.focused` (a plain `String?`) can drive `.sheet(item:)`.
-struct FocusedTerritory: Identifiable, Equatable {
-    let code: String
-    var id: String { code }
-}
-
 /// Tap a country, see what would unlock it, add the language — the app's discovery loop.
+///
+/// Also handles a tap that landed inside a curated sub-national region (a Swiss canton, Quebec,
+/// Texas): the same layout, driven by that region's own language percentages instead of its
+/// country's, with a row up to the country so the whole-country view is never more than a tap
+/// away. Only a minority of countries have curated regions, so most taps still land on a country.
 struct CountryDetailSheet: View {
-    let code: String
+    let feature: MapFeature
     var state: AppState
 
     private let store = DataStore.shared
@@ -18,7 +17,11 @@ struct CountryDetailSheet: View {
             List {
                 Section { header }
                     .navyRows()
-                Section("Languages spoken here") {
+                if case .region(_, let country) = feature {
+                    Section { parentCountryRow(country) }
+                        .navyRows()
+                }
+                Section(languagesSectionTitle) {
                     ForEach(languagesHere, id: \.language.code) { entry in
                         languageRow(entry.language, entry.presence)
                     }
@@ -26,7 +29,7 @@ struct CountryDetailSheet: View {
                 .navyRows()
             }
             .navyList()
-            .navigationTitle(territory?.name ?? code)
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
         }
         .presentationDetents([.medium, .large])
@@ -40,8 +43,8 @@ struct CountryDetailSheet: View {
             HStack(spacing: 12) {
                 Text(flag).font(.system(size: 40))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(territory?.name ?? code).font(.title2.bold())
-                    if let population = territory?.population {
+                    Text(title).font(.title2.bold())
+                    if let population {
                         Text("\(population.formatted()) people")
                             .font(.subheadline)
                             .foregroundStyle(Theme.textMuted)
@@ -58,6 +61,28 @@ struct CountryDetailSheet: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    /// Shown only for a region: retargets the sheet at the country containing it, so tapping a
+    /// canton is not a dead end for anyone who wanted Switzerland.
+    private func parentCountryRow(_ country: String) -> some View {
+        Button {
+            state.focused = .country(country)
+        } label: {
+            HStack(spacing: 12) {
+                Text("Part of")
+                    .foregroundStyle(Theme.textMuted)
+                Text(store.territories[country]?.name ?? country)
+                    .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.textMuted)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Part of \(store.territories[country]?.name ?? country), show the whole country")
     }
 
     private var tint: Color {
@@ -101,13 +126,53 @@ struct CountryDetailSheet: View {
 
     // MARK: - Data
 
-    private var territory: Territory? { store.territories[code] }
-    private var coverage: CountryCoverage? { state.coverage[code] }
+    private var title: String {
+        switch feature {
+        case .country(let code):
+            return store.territories[code]?.name ?? code
+        case .region(let id, _):
+            return store.regionsById[id]?.name ?? id
+        }
+    }
 
-    /// Every language spoken here over 1%, selected ones first, then by strength.
+    /// A region carries its own Wikidata population; a country its CLDR one. Either can be
+    /// missing or zero, in which case the line is dropped rather than showing "0 people".
+    private var population: Int? {
+        let value: Int?
+        switch feature {
+        case .country(let code): value = store.territories[code]?.population
+        case .region(let id, _): value = store.regionsById[id]?.population
+        }
+        return (value ?? 0) > 0 ? value : nil
+    }
+
+    private var coverage: CountryCoverage? {
+        switch feature {
+        case .country(let code): return state.coverage[code]
+        case .region(let id, _): return state.regionCoverage[id]
+        }
+    }
+
+    private var languagesSectionTitle: String {
+        switch feature {
+        case .country: return "Languages spoken here"
+        // Named so the numbers below are not mistaken for the country's. The curated regional
+        // figures are hand estimates — the attribution sheet says so — and they differ from the
+        // country's on purpose; that difference is the whole reason these regions exist.
+        case .region:  return "Languages spoken in this region"
+        }
+    }
+
+    /// Every language present here over 1%, selected ones first, then by strength. Regions read
+    /// from each language's curated `regions` map; countries from its `territories` map.
     private var languagesHere: [(language: Language, presence: LanguagePresence)] {
         store.languages.compactMap { language -> (Language, LanguagePresence)? in
-            guard let presence = language.territories[code], presence.pct >= 1 else { return nil }
+            let presence: LanguagePresence?
+            switch feature {
+            case .country(let code): presence = language.territories[code]
+            case .region(let id, _): presence = language.regions?[id]
+            }
+            guard let presence, presence.pct >= 1 else { return nil }
             return (language, presence)
         }.sorted { a, b in
             let aSelected = state.selected.contains(a.0.code)
@@ -118,9 +183,11 @@ struct CountryDetailSheet: View {
     }
 
     /// The ISO alpha-2 code as a flag emoji: each letter offset into the regional-indicator range.
+    /// A region shows its country's flag — there are no flag emoji below the country level.
     private var flag: String {
         String(String.UnicodeScalarView(
-            code.uppercased().unicodeScalars.compactMap { Unicode.Scalar(0x1F1E6 + $0.value - 65) }
+            feature.territory.uppercased().unicodeScalars
+                .compactMap { Unicode.Scalar(0x1F1E6 + $0.value - 65) }
         ))
     }
 }

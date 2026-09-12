@@ -13,7 +13,7 @@ final class AppState {
     private(set) var stats: WorldStats = WorldStats(peopleReached: 0, worldPopulation: 0,
                                                     countriesMajority: 0, countriesAny: 0,
                                                     countriesOfficial: 0)
-    var focused: String?                    // tapped territory
+    var focused: MapFeature?                // whatever the last tap resolved to
 
     /// The palette has this many distinct hues; selecting more would reuse a color.
     static let maxSelected = Palette.languageHues.count
@@ -25,10 +25,16 @@ final class AppState {
         let stored = UserDefaults.standard.array(forKey: key) as? [String]
         selected = stored ?? Self.seedFromDeviceLocale()
         // Property observers don't run for assignments made inside an initializer, so a seeded
-        // selection has to be written back by hand. Persisting it — even when the seed came out
-        // empty — is what makes this run exactly once per install: on every later launch `stored`
-        // is non-nil, so deselecting everything stays deselected instead of silently refilling.
-        if stored == nil { persist() }
+        // selection has to be written back by hand.
+        //
+        // Only a seed that actually found something is written. Once anything is stored — a seed,
+        // or the empty array `toggle` writes when the user removes their last language — `stored`
+        // is non-nil and seeding never runs again, so deselecting everything stays deselected.
+        // Persisting an *empty* seed would instead make emptiness permanent: a first launch that
+        // matched nothing would look identical to a deliberate deselect forever after, and the
+        // user would never be seeded even once. Leaving it unwritten costs one cheap retry per
+        // launch until a language matches.
+        if stored == nil, !selected.isEmpty { persist() }
         recompute()
     }
 

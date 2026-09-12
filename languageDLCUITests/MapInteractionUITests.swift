@@ -75,6 +75,41 @@ final class MapInteractionUITests: XCTestCase {
         XCTAssertFalse(list.exists)
     }
 
+    /// Curated regions are tappable on the globe, so the accessible list has to offer them too —
+    /// and tapping one must open its own sheet, not its country's, with a route back up to the
+    /// country so a region is never a dead end.
+    @MainActor
+    func testRegionRowOpensItsOwnSheetWithARouteToTheCountry() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        let listButton = app.buttons["List"]
+        XCTAssertTrue(listButton.waitForExistence(timeout: 15))
+        listButton.tap()
+
+        let list = app.descendants(matching: .any).matching(identifier: "countryList").firstMatch
+        XCTAssertTrue(list.waitForExistence(timeout: 10))
+
+        // Quebec sits under Canada, wherever coverage has put Canada in the ranking, so scroll
+        // until the row is rendered rather than assuming a position.
+        let quebec = app.buttons["CA-QC"]
+        var swipes = 0
+        while !quebec.exists && swipes < 40 {
+            list.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(quebec.exists, "never found the CA-QC row after \(swipes) swipes")
+        quebec.tap()
+
+        XCTAssertTrue(app.navigationBars["Québec"].waitForExistence(timeout: 10))
+
+        // The parent row retargets the sheet at Canada.
+        let parent = app.buttons["Part of Canada, show the whole country"]
+        XCTAssertTrue(parent.waitForExistence(timeout: 5))
+        parent.tap()
+        XCTAssertTrue(app.navigationBars["Canada"].waitForExistence(timeout: 10))
+    }
+
     /// §9.4: the data caveat sheet must be reachable and dismissible without disturbing the map.
     @MainActor
     func testAttributionSheetOpensAndDismisses() throws {

@@ -73,6 +73,32 @@ struct CountryGeometry: Codable, Identifiable {
     let rings: [[Double]]        // flat [lon, lat, lon, lat, ...]
 }
 
+/// What a tap on the globe resolved to.
+///
+/// Curated regions are drawn into the pick map on top of their country, so a tap inside one
+/// resolves to the region and a tap anywhere else in that country still resolves to the country.
+/// Only a minority of countries have curated regions at all, so both cases stay common.
+enum MapFeature: Hashable, Identifiable {
+    case country(String)                        // ISO 3166-1 alpha-2
+    case region(id: String, country: String)    // ISO 3166-2, plus its alpha-2 prefix
+
+    var id: String {
+        switch self {
+        case .country(let code):  return code
+        case .region(let id, _):  return id
+        }
+    }
+
+    /// The country this sits in, region or not — what territory population and whole-country
+    /// coverage lookups key on.
+    var territory: String {
+        switch self {
+        case .country(let code):     return code
+        case .region(_, let country): return country
+        }
+    }
+}
+
 /// A curated sub-national region (e.g. a Swiss canton), drawn on top of its country's fill.
 /// Phase 10.4 — see PLAN.md for the curated list and why it's province/canton/state-level.
 struct RegionGeometry: Codable, Identifiable {

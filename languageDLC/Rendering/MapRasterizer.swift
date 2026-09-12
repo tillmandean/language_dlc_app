@@ -27,9 +27,12 @@ final class MapRasterizer {
     let pickHeight: Int
 
     private(set) var ids: [String] = []          // index -> territory code
-    /// Curated sub-national regions (Phase 10.4), drawn on top of the country fill. Not part of
-    /// the pick map — tapping still resolves to the country underneath.
+    /// Curated sub-national regions (Phase 10.4), drawn on top of the country fill — in the pick
+    /// map as well as the visible texture, so a tap inside one resolves to the region.
     private(set) var regionIds: [String] = []
+    /// Parallel to `regionIds`: the alpha-2 country each region belongs to, so a region hit can
+    /// name its parent without re-parsing the id.
+    private(set) var regionCountries: [String] = []
 
     private struct Shape {
         let path: CGPath      // three copies (-width, 0, +width), texture pixel space
@@ -61,6 +64,7 @@ final class MapRasterizer {
                                              labelLat: region.labelLat, width: width, height: height)
             else { continue }
             regionIds.append(region.id)
+            regionCountries.append(region.country)
             regionShapes.append(shape)
         }
         renderPickMap()
@@ -200,6 +204,19 @@ final class MapRasterizer {
             drawDot(shape, in: ctx, scale: scale)
         }
 
+        // Regions last, so they sit on top of the country they carve into — the same order the
+        // visible texture draws them in, which is what keeps a tap agreeing with what's on screen.
+        //
+        // Deliberately no tiny-shape dots here. A country too small to rasterize still has to be
+        // reachable somehow, so a dot is the only option; a canton too small to rasterize is
+        // already invisible on the globe, and giving it a hit target the user cannot see would
+        // steal taps from the country around it.
+        for (i, shape) in regionShapes.enumerated() {
+            ctx.setFillColor(Self.indexColor(ids.count + 1 + i))
+            ctx.addPath(shape.path)
+            ctx.fillPath(using: .evenOdd)
+        }
+
         guard let data = ctx.data else { return }
         let count = pickWidth * pickHeight * 4
         pickBuffer = [UInt8](UnsafeBufferPointer(start: data.assumingMemoryBound(to: UInt8.self),
@@ -218,37 +235,47 @@ final class MapRasterizer {
 
     /// `u`, `v` are texture coordinates in 0...1 with v measured from the top of the image.
     /// Returns nil only if nothing but ocean lies within `tolerancePixels` (pick-map pixels).
-    func territory(atU u: Double, v: Double, tolerancePixels: Int = 12) -> String? {
+    func feature(atU u: Double, v: Double, tolerancePixels: Int = 12) -> MapFeature? {
         guard !pickBuffer.isEmpty else { return nil }
         let wrappedU = u - floor(u)
         let x = min(pickWidth - 1, max(0, Int(wrappedU * Double(pickWidth))))
         let y = min(pickHeight - 1, max(0, Int(min(max(v, 0), 1) * Double(pickHeight))))
 
-        if let id = territory(atX: x, y: y) { return id }
+        if let hit = feature(atX: x, y: y) { return hit }
         // Spiral outward so pinprick islands stay tappable.
         guard tolerancePixels > 0 else { return nil }
         for r in 1...tolerancePixels {
             for dx in -r...r {
-                if let id = territory(atX: x + dx, y: y - r) { return id }
-                if let id = territory(atX: x + dx, y: y + r) { return id }
+                if let hit = feature(atX: x + dx, y: y - r) { return hit }
+                if let hit = feature(atX: x + dx, y: y + r) { return hit }
             }
             if r > 1 {
                 for dy in (-r + 1)...(r - 1) {
-                    if let id = territory(atX: x - r, y: y + dy) { return id }
-                    if let id = territory(atX: x + r, y: y + dy) { return id }
+                    if let hit = feature(atX: x - r, y: y + dy) { return hit }
+                    if let hit = feature(atX: x + r, y: y + dy) { return hit }
                 }
             }
         }
         return nil
     }
 
-    private func territory(atX x: Int, y: Int) -> String? {
+    /// The same lookup reduced to a country code: a tap inside a curated region reports the
+    /// country containing it. This is what callers that only deal in territories want, and it
+    /// keeps the pick map's country-level behaviour identical to before regions were added to it.
+    func territory(atU u: Double, v: Double, tolerancePixels: Int = 12) -> String? {
+        feature(atU: u, v: v, tolerancePixels: tolerancePixels)?.territory
+    }
+
+    private func feature(atX x: Int, y: Int) -> MapFeature? {
         guard y >= 0, y < pickHeight else { return nil }
         let wrappedX = ((x % pickWidth) + pickWidth) % pickWidth   // the map is a cylinder
         let offset = (y * pickWidth + wrappedX) * 4
         let index = Int(pickBuffer[offset]) | (Int(pickBuffer[offset + 1]) << 8)
-        guard index > 0, index <= ids.count else { return nil }
-        return ids[index - 1]
+        guard index > 0 else { return nil }                        // 0 is ocean
+        if index <= ids.count { return .country(ids[index - 1]) }
+        let regionIndex = index - ids.count - 1
+        guard regionIndex < regionIds.count else { return nil }
+        return .region(id: regionIds[regionIndex], country: regionCountries[regionIndex])
     }
 
     // MARK: - Drawing helpers

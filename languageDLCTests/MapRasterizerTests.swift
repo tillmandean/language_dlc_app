@@ -101,6 +101,51 @@ struct MapRasterizerTests {
         #expect(territory(r, lon: -30.0, lat: 30.0) == nil)      // mid-Atlantic
     }
 
+    private func feature(_ r: MapRasterizer, lon: Double, lat: Double) -> MapFeature? {
+        let p = uv(lon: lon, lat: lat)
+        return r.feature(atU: p.u, v: p.v)
+    }
+
+    /// Curated regions are in the pick map on top of their country, so a tap inside one resolves
+    /// to the region rather than the country — the gap this closes is that tapping Quebec used to
+    /// report Canada.
+    @Test func tapsInsideACuratedRegionResolveToTheRegion() {
+        let r = MapRasterizer.shared
+        #expect(feature(r, lon: -71.2, lat: 46.8) == .region(id: "CA-QC", country: "CA"))  // Quebec City
+        #expect(feature(r, lon: 2.15, lat: 41.39) == .region(id: "ES-B", country: "ES"))   // Barcelona
+        #expect(feature(r, lon: -97.7, lat: 30.3) == .region(id: "US-TX", country: "US"))  // Austin
+    }
+
+    /// The country underneath stays reachable everywhere that isn't curated — only a minority of
+    /// each country is, so this is the common case even in countries that have regions.
+    @Test func tapsOutsideACuratedRegionStillResolveToTheCountry() {
+        let r = MapRasterizer.shared
+        #expect(feature(r, lon: -83.0, lat: 40.0) == .country("US"))   // Ohio, not curated
+        #expect(feature(r, lon: -113.5, lat: 53.5) == .country("CA"))  // Alberta, not curated
+    }
+
+    /// `territory(atU:v:)` is the country-level view of the same lookup: a hit inside a region
+    /// reports the country containing it, so every existing territory-keyed caller is unaffected
+    /// by regions having been added to the pick map.
+    @Test func territoryReportsTheCountryForARegionHit() {
+        let r = MapRasterizer.shared
+        #expect(territory(r, lon: -71.2, lat: 46.8) == "CA")
+        #expect(territory(r, lon: -97.7, lat: 30.3) == "US")
+    }
+
+    /// Region indices live above the country range in the same buffer, so an off-by-one in the
+    /// encoding would silently turn regions into countries or run past the end of `regionIds`.
+    @Test func regionIndicesDoNotCollideWithCountryIndices() {
+        let r = MapRasterizer.shared
+        #expect(r.regionIds.count == r.regionCountries.count)
+        #expect(r.regionIds.count > 0)
+        // Every region id must carry its country as its prefix, which is what the pick map's
+        // parallel arrays assume when it reports a hit.
+        for (id, country) in zip(r.regionIds, r.regionCountries) {
+            #expect(id.hasPrefix(country))
+        }
+    }
+
     @Test func textureRendersAtRequestedSize() {
         let r = MapRasterizer(countries: DataStore.shared.countries, width: 512, height: 256)
         let image = r.renderTexture(colors: [:], ocean: Palette.ocean,

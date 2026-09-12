@@ -7,6 +7,7 @@ final class DataStore {
     let countries: [CountryGeometry]
     let regions: [RegionGeometry]
     let languagesByCode: [String: Language]
+    let regionsById: [String: RegionGeometry]
 
     static let shared = DataStore()
 
@@ -16,6 +17,7 @@ final class DataStore {
         countries   = Self.load("geometry.json",    GeometryFile.self).countries
         regions     = Self.load("regions.json",     RegionFile.self).regions
         languagesByCode = Dictionary(uniqueKeysWithValues: languages.map { ($0.code, $0) })
+        regionsById = Dictionary(uniqueKeysWithValues: regions.map { ($0.id, $0) })
     }
 
     /// Test-only constructor: bypasses the bundle and builds a store from in-memory data.
@@ -26,6 +28,7 @@ final class DataStore {
         self.countries = countries
         self.regions = regions
         self.languagesByCode = Dictionary(uniqueKeysWithValues: languages.map { ($0.code, $0) })
+        self.regionsById = Dictionary(uniqueKeysWithValues: regions.map { ($0.id, $0) })
     }
 
     private static func load<T: Decodable>(_ file: String, _ type: T.Type) -> T {
