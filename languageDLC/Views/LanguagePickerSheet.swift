@@ -22,6 +22,7 @@ struct LanguagePickerSheet: View {
                     Section("Selected") {
                         ForEach(selectedLanguages) { row(for: $0) }
                     }
+                    .navyRows()
                 }
                 if !suggestedLanguages.isEmpty {
                     Section("Learn next") {
@@ -29,6 +30,7 @@ struct LanguagePickerSheet: View {
                             suggestionRow(entry.language, gain: entry.gain)
                         }
                     }
+                    .navyRows()
                 }
                 Section {
                     ForEach(filteredLanguages) { row(for: $0) }
@@ -37,8 +39,10 @@ struct LanguagePickerSheet: View {
                         Text("Languages with under 1M speakers are hidden.")
                     }
                 }
+                .navyRows()
             }
             .listStyle(.insetGrouped)
+            .navyList()
             .searchable(text: $query, prompt: "Search languages")
             .task(id: state.selected) {
                 let selected = state.selected
@@ -64,6 +68,7 @@ struct LanguagePickerSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationBackground(Theme.navy)
     }
 
     // MARK: - Rows
@@ -98,7 +103,7 @@ struct LanguagePickerSheet: View {
 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(isSelected ? .green : .secondary)
+                    .foregroundStyle(isSelected ? Theme.skyBright : .secondary)
             }
             .contentShape(Rectangle())
         }
@@ -122,7 +127,7 @@ struct LanguagePickerSheet: View {
                 Spacer()
                 Text("+\(String(format: "%.1f", gain * 100))%")
                     .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Theme.skyBright)
             }
             .contentShape(Rectangle())
         }

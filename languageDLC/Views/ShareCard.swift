@@ -61,7 +61,7 @@ enum ShareCardRenderer {
 
         let titleAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 32, weight: .semibold),
-            .foregroundColor: UIColor.white.withAlphaComponent(0.7),
+            .foregroundColor: UIColor(red: 0.180, green: 0.651, blue: 1.0, alpha: 1),  // Theme.sky
         ]
         let headlineAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.monospacedDigitSystemFont(ofSize: 56, weight: .bold),

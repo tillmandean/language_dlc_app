@@ -16,11 +16,13 @@ struct CountryListView: View {
                 content(for: row)
             }
             .buttonStyle(.plain)
+            .listRowBackground(Color.clear)
+            .listRowSeparatorTint(Theme.hairline)
             .accessibilityLabel(accessibilityLabel(for: row))
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Color.black)
+        .background(Theme.background)
         .accessibilityIdentifier("countryList")
     }
 
@@ -33,13 +35,16 @@ struct CountryListView: View {
                    let language = store.languagesByCode[dominant] {
                     Text(language.displayName)
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Theme.sky.opacity(0.85))
                 }
             }
             Spacer()
+            // Unlocked countries get the accent; the long tail of 0% stays quiet so the list
+            // can be skimmed for what's actually been covered.
             Text(percentString(row.coverage?.coverage ?? 0))
                 .font(.subheadline.monospacedDigit())
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle((row.coverage?.coverage ?? 0) > 0
+                                 ? Theme.skyBright : .white.opacity(0.35))
         }
         .contentShape(Rectangle())
     }

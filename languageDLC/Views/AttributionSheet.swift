@@ -19,6 +19,7 @@ struct AttributionSheet: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .navyRows()
                 Section("Map data") {
                     Text("Country outlines come from Natural Earth.")
                     Text("""
@@ -31,11 +32,14 @@ struct AttributionSheet: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .navyRows()
             }
+            .navyList()
             .navigationTitle("Data & credits")
             .navigationBarTitleDisplayMode(.inline)
         }
         .presentationDetents([.medium, .large])
+        .presentationBackground(Theme.navy)
     }
 }
 

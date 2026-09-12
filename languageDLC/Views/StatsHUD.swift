@@ -29,7 +29,14 @@ struct StatsHUD: View {
             }
         }
         .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .background {
+            // Navy tint over the material, so the panel stays part of the palette instead of
+            // picking up whatever colour the globe happens to be showing behind it.
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .overlay(RoundedRectangle(cornerRadius: 20).fill(Theme.navySurface.opacity(0.55)))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(Theme.hairline, lineWidth: 1))
+        }
         .animation(.snappy(duration: 0.35), value: state.stats.fraction)
         .animation(.snappy(duration: 0.35), value: state.selected)
         .onChange(of: state.stats.fraction) { old, new in checkMilestone(old: old, new: new) }
@@ -40,7 +47,7 @@ struct StatsHUD: View {
     private var emptyState: some View {
         Text("Pick a language to see what you unlock.")
             .font(.subheadline)
-            .foregroundStyle(.white.opacity(0.85))
+            .foregroundStyle(Theme.sky)
             .accessibilityIdentifier("worldSummary")
             .allowsHitTesting(false)
     }
@@ -107,7 +114,7 @@ struct StatsHUD: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .foregroundStyle(.white)
-            .background(.white.opacity(0.18), in: Capsule())
+            .background(Theme.sky.opacity(0.28), in: Capsule())
             .transition(.move(edge: .top).combined(with: .opacity))
             .allowsHitTesting(false)
     }
@@ -116,7 +123,7 @@ struct StatsHUD: View {
 
     private var hueGradient: LinearGradient {
         let colors = state.selected.map(chipColor)
-        return LinearGradient(colors: colors.isEmpty ? [.gray] : colors,
+        return LinearGradient(colors: colors.isEmpty ? [Theme.sky, Theme.skyBright] : colors,
                               startPoint: .leading, endPoint: .trailing)
     }
 
@@ -155,7 +162,7 @@ struct StatsHUD: View {
 
 #Preview {
     ZStack {
-        Color.black.ignoresSafeArea()
+        Theme.background.ignoresSafeArea()
         VStack {
             StatsHUD(state: AppState())
             Spacer()

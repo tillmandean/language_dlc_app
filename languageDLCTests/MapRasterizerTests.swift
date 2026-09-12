@@ -63,8 +63,13 @@ struct MapRasterizerTests {
         let brazil = pixel(lon: -52.0, lat: -10.0)
         #expect(mexico.b > mexico.r)                 // hue 0.55 is blue
         #expect(mexico.b > 100)
-        #expect(brazil.r == brazil.b)                // grey
-        #expect(brazil.r < 80)
+        // Brazil is untouched by the selection, so it must still be exactly the locked-land
+        // color — a stronger check than "some dim grey", and one that survives re-tinting the
+        // palette (locked land is navy-slate now, not neutral grey).
+        let locked = Palette.lockedLand.components!.map { UInt8(($0 * 255).rounded()) }
+        #expect(brazil.r == locked[0])
+        #expect(brazil.g == locked[1])
+        #expect(brazil.b == locked[2])
     }
 
     /// Phase 10.4: a curated region drawn with its own color must not bleed into the rest of its

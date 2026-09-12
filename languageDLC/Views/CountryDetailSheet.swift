@@ -17,16 +17,20 @@ struct CountryDetailSheet: View {
         NavigationStack {
             List {
                 Section { header }
+                    .navyRows()
                 Section("Languages spoken here") {
                     ForEach(languagesHere, id: \.language.code) { entry in
                         languageRow(entry.language, entry.presence)
                     }
                 }
+                .navyRows()
             }
+            .navyList()
             .navigationTitle(territory?.name ?? code)
             .navigationBarTitleDisplayMode(.inline)
         }
         .presentationDetents([.medium, .large])
+        .presentationBackground(Theme.navy)
     }
 
     // MARK: - Header
@@ -88,7 +92,7 @@ struct CountryDetailSheet: View {
             } label: {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "plus.circle")
                     .font(.title2)
-                    .foregroundStyle(isSelected ? .green : .accentColor)
+                    .foregroundStyle(isSelected ? Theme.skyBright : Theme.sky.opacity(0.7))
             }
             .buttonStyle(.plain)
         }

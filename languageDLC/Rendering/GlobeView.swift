@@ -50,7 +50,10 @@ struct GlobeView: UIViewRepresentable {
         let built = Self.makeScene()
         view.scene = built.scene
         view.pointOfView = built.camera
-        view.backgroundColor = .black
+        // Transparent so the navy gradient behind the SwiftUI ZStack shows through instead of a
+        // flat rectangle — the globe reads as sitting in the background, not on top of it.
+        view.backgroundColor = .clear
+        view.isOpaque = false
         view.antialiasingMode = .multisampling2X
         view.autoenablesDefaultLighting = false
         view.isPlaying = true                    // actions only advance on a playing view

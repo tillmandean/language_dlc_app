@@ -23,7 +23,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Theme.background.ignoresSafeArea()
 
             if showList {
                 CountryListView(state: state)
@@ -46,7 +46,7 @@ struct ContentView: View {
                 .accessibilityLabel(globeAccessibilityLabel)
 
                 if texture == nil {
-                    ProgressView().tint(.white)
+                    ProgressView().tint(Theme.sky)
                 }
 
                 VStack {
@@ -86,7 +86,11 @@ struct ContentView: View {
         VStack(spacing: 12) {
             Text(focusLabel)
                 .font(.headline)
-                .foregroundStyle(.white)
+                .foregroundStyle(state.focused == nil ? Theme.sky.opacity(0.85) : .white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(Theme.navySurface.opacity(0.75), in: Capsule())
+                .overlay(Capsule().stroke(Theme.hairline, lineWidth: 1))
                 .accessibilityIdentifier("focusedTerritory")
 
             // Centred when the row fits, which it now does with the calibration button gone.
@@ -107,6 +111,7 @@ struct ContentView: View {
                 Label("Languages", systemImage: "globe")
             }
             .buttonStyle(.borderedProminent)
+            .tint(Theme.sky)
             .fixedSize()
 
             listToggleButton
@@ -117,7 +122,7 @@ struct ContentView: View {
                 Image(systemName: "info.circle")
             }
             .buttonStyle(.bordered)
-            .tint(.white)
+            .tint(Theme.sky)
             .accessibilityLabel("Data & credits")
 
             Button {
@@ -126,7 +131,7 @@ struct ContentView: View {
                 Image(systemName: "square.and.arrow.up")
             }
             .buttonStyle(.bordered)
-            .tint(.white)
+            .tint(Theme.sky)
             .disabled(state.selected.isEmpty || texture == nil)
             .accessibilityLabel("Share")
         }
@@ -140,7 +145,11 @@ struct ContentView: View {
             Image(systemName: showList ? "globe.americas.fill" : "list.bullet")
         }
         .buttonStyle(.bordered)
-        .tint(.white)
+        .tint(Theme.sky)
+        // In list mode this button floats over the rows, and `.bordered` is translucent — the
+        // row's text showed straight through it. An opaque navy backing makes it read as a
+        // control sitting on top rather than a rendering glitch.
+        .background(Theme.navy, in: Capsule())
         .accessibilityLabel(showList ? "Globe" : "List")
         .accessibilityHint("Switch to a VoiceOver-friendly list of countries")
     }
