@@ -2,9 +2,10 @@
 //  ContentView.swift
 //  languageDLC
 //
-//  Milestone B: the map texture wrapped on a rotatable globe, with a country detail sheet
-//  and the language picker. The tapped-country readout is temporary; Phase 8 replaces it
-//  with the stats HUD.
+//  The app's root screen: the map texture wrapped on a rotatable globe, the stats HUD above it
+//  and the control row below, plus the sheets they open — language picker, country detail,
+//  attribution, and the share sheet. `showList` swaps the globe for the VoiceOver-friendly
+//  country list, which is the accessible route to the same data.
 //
 
 import SwiftUI
@@ -188,11 +189,6 @@ struct ContentView: View {
             "Use the List button to browse countries instead."
     }
 
-    private var summary: String {
-        let s = state.stats
-        let pct = String(format: "%.1f%%", s.fraction * 100)
-        return "\(pct) of the world · \(s.countriesAny) countries · \(s.countriesOfficial) official"
-    }
 }
 
 #Preview {

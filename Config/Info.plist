@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Everything else in this app's Info.plist is generated from INFOPLIST_KEY_* build
+	     settings (GENERATE_INFOPLIST_FILE = YES merges those on top of this file). This file
+	     exists for the one key that has no build setting behind it.
+
+	     UILaunchScreen's *background colour* cannot be set from a build setting: the only
+	     recognised launch-screen setting is INFOPLIST_KEY_UILaunchScreen_Generation, which
+	     emits an empty UILaunchScreen dict and nothing else. An empty dict means "plain launch
+	     screen in the system background colour" — white on a device in light mode. The app is
+	     dark-only and fades in from a navy splash, so that produced a white flash before the
+	     first frame. Naming the colorset here is what actually makes the pre-launch frame navy. -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
+</dict>
+</plist>
