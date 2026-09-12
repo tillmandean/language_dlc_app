@@ -30,6 +30,13 @@ enum OfficialStatus: String, Codable {
 struct LanguagePresence: Codable, Hashable {
     let pct: Double              // 0...100
     let status: OfficialStatus?  // nil = spoken but not official
+    /// Territory entries only, and only where curated regions carve into this country: the
+    /// percentage for the *rest* of it, once those regions are carved out. `pct` stays the
+    /// whole-country figure and is what speaker counts and world coverage use; `restPct` exists
+    /// so the map doesn't fill the remainder with an average that already includes the regions
+    /// drawn on top of it. Derived in `scripts/build_data.py`; `nil` means "no curated regions
+    /// here, `pct` is the whole story."
+    var restPct: Double? = nil
 }
 
 struct Language: Codable, Identifiable, Hashable {
@@ -75,4 +82,7 @@ struct RegionGeometry: Codable, Identifiable {
     let labelLon: Double
     let labelLat: Double
     let rings: [[Double]]
+    /// From Wikidata (P1082), scaled down where a country's curated regions sum past its CLDR
+    /// population. Used at build time as the within-country weight for `LanguagePresence.restPct`.
+    var population: Int = 0
 }

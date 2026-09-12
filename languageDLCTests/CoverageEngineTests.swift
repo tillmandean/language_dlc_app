@@ -96,6 +96,48 @@ struct CoverageEngineTests {
         #expect(stats.countriesAny == 0)
     }
 
+    @Test func paintCoverageUsesRestPctWhileWorldStatsStayWholeCountry() {
+        let store = DataStore(
+            territories: ["XX": Territory(name: "", population: 1_000_000)],
+            languages: [Language(code: "A", name: "A", speakers: 0,
+                                 territories: ["XX": LanguagePresence(pct: 40, status: nil,
+                                                                      restPct: 10)],
+                                 regions: ["XX-REG": LanguagePresence(pct: 90, status: nil)])],
+            countries: [])
+
+        // The map fill for the part no curated region covers uses restPct...
+        let paint = CoverageEngine.paintCoverage(for: ["A"], in: store)
+        #expect(abs((paint["XX"]?.coverage ?? -1) - 0.10) < 1e-9)
+
+        // ...while the country statistic and world coverage keep the whole-country pct, so
+        // deriving a residual can never move the headline percentage.
+        let coverage = CoverageEngine.coverage(for: ["A"], in: store)
+        #expect(abs((coverage["XX"]?.coverage ?? -1) - 0.40) < 1e-9)
+        #expect(CoverageEngine.stats(coverage, in: store).peopleReached == 400_000)
+
+        // The carved-out region keeps its own figure, above both.
+        let regions = CoverageEngine.regionCoverage(for: ["A"], in: store)
+        #expect(abs((regions["XX-REG"]?.coverage ?? -1) - 0.90) < 1e-9)
+    }
+
+    /// The artifact this guards against: a canton with no French entry fell through to
+    /// Switzerland's country fill and painted at the country-wide 39% — an average of the very
+    /// cantons drawn on top of it, so Zurich read as substantially French-speaking.
+    @Test func uncuratedRegionsPaintBelowTheirCuratedNeighbours() {
+        let store = DataStore.shared
+        let paint = CoverageEngine.paintCoverage(for: ["fr"], in: store)
+        let regions = CoverageEngine.regionCoverage(for: ["fr"], in: store)
+        let country = CoverageEngine.coverage(for: ["fr"], in: store)
+
+        let vaud = regions["CH-VD"]?.coverage ?? 0
+        let zurich = regions["CH-ZH"]?.coverage ?? 0
+        #expect(zurich < vaud)                                  // below the French-speaking cantons
+        #expect(zurich > 0)                                     // a residual, not a blanking
+        #expect(zurich < country["CH"]?.coverage ?? 0)          // below the whole-country average
+        // Switzerland's own fill is that same residual, so the cantons and the country agree.
+        #expect(abs((paint["CH"]?.coverage ?? -1) - zurich) < 1e-9)
+    }
+
     /// Builds a minimal in-memory DataStore via its test-only initializer.
     private func makeSyntheticStore(
         languages: [(code: String, territories: [String: (pct: Double, status: OfficialStatus?)],

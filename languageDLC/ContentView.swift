@@ -13,7 +13,6 @@ import UIKit
 struct ContentView: View {
     @State private var state = AppState()
     @State private var texture: CGImage?
-    @State private var showCalibration = false
     @State private var showPicker = false
     @State private var showList = false
     @State private var showAttribution = false
@@ -73,15 +72,12 @@ struct ContentView: View {
         .task(id: renderKey) {
             let colors = state.fillColors()
             let regionColors = state.regionFillColors()
-            let calibrating = showCalibration
             texture = await Task.detached(priority: .userInitiated) {
-                calibrating
-                    ? MapRasterizer.shared.renderCalibrationTexture()
-                    : MapRasterizer.shared.renderTexture(colors: colors,
-                                                         ocean: Palette.ocean,
-                                                         lockedLand: Palette.lockedLand,
-                                                         borders: Palette.borders,
-                                                         regionColors: regionColors)
+                MapRasterizer.shared.renderTexture(colors: colors,
+                                                   ocean: Palette.ocean,
+                                                   lockedLand: Palette.lockedLand,
+                                                   borders: Palette.borders,
+                                                   regionColors: regionColors)
             }.value
         }
     }
@@ -93,47 +89,48 @@ struct ContentView: View {
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("focusedTerritory")
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    Button {
-                        showPicker = true
-                    } label: {
-                        Label("Languages", systemImage: "globe")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .fixedSize()
-
-                    listToggleButton
-
-                    Button {
-                        showAttribution = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.white)
-                    .accessibilityLabel("Data & credits")
-
-                    Button {
-                        shareGlobe()
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.white)
-                    .disabled(state.selected.isEmpty || texture == nil)
-                    .accessibilityLabel("Share")
-
-                    #if DEBUG
-                    Button(showCalibration ? "Map" : "Calibrate") { showCalibration.toggle() }
-                        .buttonStyle(.bordered)
-                        .tint(.white)
-                        .fixedSize()
-                    #endif
-                }
-                .padding(.horizontal, 2)   // room for the focus ring/shadow at the scroll edges
+            // Centred when the row fits, which it now does with the calibration button gone.
+            // The scrolling version is still there as the fallback, because at the largest
+            // accessibility text sizes "Languages" alone can outgrow a narrow screen.
+            ViewThatFits(in: .horizontal) {
+                controlRow
+                ScrollView(.horizontal, showsIndicators: false) { controlRow }
             }
         }
+    }
+
+    private var controlRow: some View {
+        HStack(spacing: 12) {
+            Button {
+                showPicker = true
+            } label: {
+                Label("Languages", systemImage: "globe")
+            }
+            .buttonStyle(.borderedProminent)
+            .fixedSize()
+
+            listToggleButton
+
+            Button {
+                showAttribution = true
+            } label: {
+                Image(systemName: "info.circle")
+            }
+            .buttonStyle(.bordered)
+            .tint(.white)
+            .accessibilityLabel("Data & credits")
+
+            Button {
+                shareGlobe()
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .buttonStyle(.bordered)
+            .tint(.white)
+            .disabled(state.selected.isEmpty || texture == nil)
+            .accessibilityLabel("Share")
+        }
+        .padding(.horizontal, 2)   // room for the focus ring/shadow at the row's edges
     }
 
     private var listToggleButton: some View {
@@ -153,9 +150,9 @@ struct ContentView: View {
         shareImage = ShareCardRenderer.makeCard(globe: globeImage, state: state)
     }
 
-    /// Re-render whenever the selection or the debug texture choice changes.
+    /// Re-render whenever the selection changes.
     private var renderKey: String {
-        state.selected.joined(separator: ",") + (showCalibration ? "|cal" : "")
+        state.selected.joined(separator: ",")
     }
 
     private var focusLabel: String {

@@ -8,6 +8,7 @@ final class AppState {
         didSet { persist(); recompute() }
     }
     private(set) var coverage: [String: CountryCoverage] = [:]
+    private(set) var paintCoverage: [String: CountryCoverage] = [:]
     private(set) var regionCoverage: [String: CountryCoverage] = [:]
     private(set) var stats: WorldStats = WorldStats(peopleReached: 0, worldPopulation: 0,
                                                     countriesMajority: 0, countriesAny: 0,
@@ -36,9 +37,11 @@ final class AppState {
         Palette.hue(forSelectionIndex: selected.firstIndex(of: code) ?? 0)
     }
 
-    /// territory -> fill color, ready for the rasterizer.
+    /// territory -> fill color, ready for the rasterizer. Uses `paintCoverage`, not `coverage`:
+    /// where curated regions are drawn on top of a country, the country's own fill has to show
+    /// the remainder those regions leave behind, not the whole-country average they're part of.
     func fillColors() -> [String: CGColor] {
-        coverage.compactMapValues { c in
+        paintCoverage.compactMapValues { c in
             guard let dom = c.dominantLanguage else { return nil }
             return Palette.fill(hue: hue(for: dom), coverage: c.coverage)
         }
@@ -55,6 +58,7 @@ final class AppState {
 
     private func recompute() {
         coverage = CoverageEngine.coverage(for: selected, in: store)
+        paintCoverage = CoverageEngine.paintCoverage(for: selected, in: store)
         regionCoverage = CoverageEngine.regionCoverage(for: selected, in: store)
         stats = CoverageEngine.stats(coverage, in: store)
     }

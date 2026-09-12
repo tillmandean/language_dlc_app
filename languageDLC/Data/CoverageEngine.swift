@@ -25,6 +25,20 @@ enum CoverageEngine {
         aggregate(selected: selected, store: store) { $0.territories }
     }
 
+    /// Map-fill counterpart to `coverage(for:in:)`: identical except that a country whose curated
+    /// regions carve into it contributes `restPct` — the share of the part those regions *don't*
+    /// cover — instead of its whole-country `pct`. The curated regions are drawn on top of this
+    /// fill, so using `pct` here would paint the remainder with an average of the regions
+    /// covering it (Zurich at Switzerland's 39% French). Never feed this to `stats(_:in:)`:
+    /// world coverage is a whole-country question and must use `coverage(for:in:)`.
+    static func paintCoverage(for selected: [String], in store: DataStore) -> [String: CountryCoverage] {
+        aggregate(selected: selected, store: store) {
+            $0.territories.mapValues {
+                LanguagePresence(pct: $0.restPct ?? $0.pct, status: $0.status)
+            }
+        }
+    }
+
     /// Same union math as `coverage(for:in:)`, but over each language's curated sub-national
     /// presence (Phase 10.4) instead of its country-level one. Keyed by region id, e.g. "ES-CT" —
     /// these ids never collide with `store.territories`, so `stats(_:in:)` naturally ignores them

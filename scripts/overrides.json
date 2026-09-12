@@ -2,14 +2,11 @@
   "countries": {
     "en": {
       "IS": {"pct": 86, "status": null},
-      "SE": {"pct": 86, "status": null},
-      "NO": {"pct": 90, "status": null},
-      "DK": {"pct": 86, "status": null},
-      "FI": {"pct": 70, "status": null}
+      "NO": {"pct": 90, "status": null}
     },
     "ru": {
       "KZ": {"pct": 84, "status": "de_facto_official"},
-      "KG": {"pct": 49, "status": null},
+      "KG": {"pct": 49, "status": "official"},
       "UZ": {"pct": 30, "status": null},
       "TJ": {"pct": 28, "status": null},
       "TM": {"pct": 18, "status": null}

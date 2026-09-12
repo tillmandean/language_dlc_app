@@ -44,7 +44,7 @@ struct LanguagePickerSheet: View {
                 let selected = state.selected
                 let store = store
                 let ranked = await Task.detached(priority: .userInitiated) {
-                    CoverageEngine.learningGoals(selected: selected, in: store)
+                    await CoverageEngine.learningGoals(selected: selected, in: store)
                 }.value
                 suggestions = ranked.map { (code: $0.language.code, gain: $0.gain) }
             }

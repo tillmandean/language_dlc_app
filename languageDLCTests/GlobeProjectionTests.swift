@@ -220,6 +220,75 @@ struct GlobeGestureTests {
         #expect(coordinator.yaw > 0)
         #expect(coordinator.pitch == 0)
     }
+
+    /// Pushing hard into a pole used to bank the overshoot in a running total, so the drag back
+    /// did nothing until that debt was paid off — the globe felt stuck. Reversing must move it
+    /// immediately, however hard it was pushed.
+    @Test func draggingBackFromAPoleRespondsImmediately() throws {
+        let coordinator = GlobeView.Coordinator(onTap: { _, _ in })
+        for _ in 0..<200 { coordinator.applyRotation(dx: 0, dy: 100) }   // jam it into the pole
+        let stuck = coordinator.pitch
+        #expect(abs(stuck - Float(80) * .pi / 180) < 0.01)
+
+        coordinator.applyRotation(dx: 0, dy: -2)      // the smallest of nudges back
+        #expect(coordinator.pitch < stuck)
+    }
+
+    /// The soft zone should only resist on the way out, and only in the last stretch before the
+    /// pole: an ordinary drag below the threshold tracks the finger exactly 1:1.
+    @Test func pitchTracksTheFingerOutsideTheSoftZone() throws {
+        let coordinator = GlobeView.Coordinator(onTap: { _, _ in })
+        coordinator.applyRotation(dx: 0, dy: 100)
+        // No view or camera in a unit test, so applyRotation uses the fallback scale.
+        #expect(abs(coordinator.pitch - Float(100 * 0.005)) < 1e-6)
+    }
+
+    /// Where the point facing the camera ends up after a small drag, in world terms: `.y` is up
+    /// the screen, `.x` is across it.
+    private func centreMoves(pitch: Float, yaw: Float,
+                             byPitch dPitch: Float, byYaw dYaw: Float) -> SIMD3<Float> {
+        let before = GlobeView.Coordinator.orientation(pitch: pitch, yaw: yaw)
+        let after = GlobeView.Coordinator.orientation(pitch: pitch + dPitch, yaw: yaw + dYaw)
+        return after.act(before.inverse.act(SIMD3<Float>(0, 0, 1)))
+    }
+
+    /// A vertical drag must tilt the globe the same way on screen wherever it is facing. Built
+    /// from `eulerAngles` this inverted around the far side — spin round to Asia, drag down, and
+    /// the map went up — and did nothing at all a quarter turn from home, where the drag axis
+    /// pointed at the camera and the globe just rolled.
+    @Test func verticalDragTiltsTheSameWayAtEveryYaw() throws {
+        let reference = centreMoves(pitch: 0, yaw: 0, byPitch: 0.05, byYaw: 0).y
+        #expect(abs(reference) > 0.01)                    // it really does tilt at home
+        for step in 0..<12 {
+            let yaw = Float(step) * .pi / 6
+            let rise = centreMoves(pitch: 0, yaw: yaw, byPitch: 0.05, byYaw: 0).y
+            #expect(abs(rise - reference) < 1e-5,
+                    "yaw \(Int(yaw * 180 / .pi))° tilts by \(rise), not \(reference)")
+        }
+    }
+
+    /// A horizontal drag must turn the globe the same way at every tilt, including looking down
+    /// on a pole. It does slow by `cos(pitch)` as the meridians converge — that's the geometry,
+    /// and what `yawConvergence` compensates for — but the direction must never flip.
+    @Test func horizontalDragTurnsTheSameWayAtEveryPitch() throws {
+        let reference = centreMoves(pitch: 0, yaw: 0, byPitch: 0, byYaw: 0.05).x
+        #expect(reference > 0)
+        for degrees in stride(from: Float(-80), through: 80, by: 10) {
+            let pitch = degrees * .pi / 180
+            let run = centreMoves(pitch: pitch, yaw: 0, byPitch: 0, byYaw: 0.05).x
+            #expect(run > 0, "\(Int(degrees))° of pitch turns the globe backwards")
+            #expect(abs(run - reference * cos(pitch)) < 1e-5)
+        }
+    }
+
+    /// Yaw and pitch must come from the same factor, or a diagonal drag would curve.
+    @Test func horizontalAndVerticalDragsMoveByTheSameAmount() throws {
+        let horizontal = GlobeView.Coordinator(onTap: { _, _ in })
+        let vertical = GlobeView.Coordinator(onTap: { _, _ in })
+        horizontal.applyRotation(dx: 60, dy: 0)
+        vertical.applyRotation(dx: 0, dy: 60)
+        #expect(abs(horizontal.yaw - vertical.pitch) < 1e-6)
+    }
 }
 
 /// The globe has to redraw every frame while the user drags it, so a frame must cost well
@@ -249,6 +318,29 @@ struct GlobeRenderingTests {
         let perFrame = (CFAbsoluteTimeGetCurrent() - start) / Double(frames)
         #expect(perFrame < 1.0 / 60)
     }
+
+    /// The closest zoom must still show a globe. Pinching all the way in once punched the camera
+    /// through the near plane and left the screen black; `zNear` is 0.05 against a radius-1
+    /// sphere, so the camera has to stay outside z = 1.05. This renders at the actual limit and
+    /// checks the middle of the view is painted.
+    @Test func theClosestZoomStillRendersTheGlobe() throws {
+        let built = GlobeView.makeScene()
+        let view = SCNView(frame: CGRect(x: 0, y: 0, width: 400, height: 800))
+        view.scene = built.scene
+        view.pointOfView = built.camera
+        built.globe.geometry?.firstMaterial?.diffuse.contents =
+            try #require(MapRasterizer.shared.renderTexture(colors: [:],
+                                                            ocean: Palette.ocean,
+                                                            lockedLand: Palette.lockedLand,
+                                                            borders: Palette.borders))
+
+        built.camera.position.z = Float(GlobeView.Coordinator.closestCameraZ)
+        let sampler = try #require(PixelSampler(view.snapshot()))
+        // Zoomed this far in the globe overfills the view, so every one of these is on it.
+        for (x, y) in [(200, 400), (40, 400), (360, 400), (200, 80), (200, 720)] {
+            #expect(!sampler.isBlack(x: x, y: y), "view is black at (\(x), \(y))")
+        }
+    }
 }
 
 /// Minimal RGBA reader over a rendered `UIImage`.
@@ -273,4 +365,14 @@ private struct PixelSampler {
         let o = py * bytesPerRow + px * 4
         return data[o] > threshold && data[o + 1] > threshold && data[o + 2] > threshold
     }
+
+    /// The scene's background, i.e. "nothing was drawn here."
+    func isBlack(x: Int, y: Int, threshold: UInt8 = 12) -> Bool {
+        let scale = width / 400
+        let px = x * scale, py = y * scale
+        guard px >= 0, px < width, py >= 0, py < height else { return true }
+        let o = py * bytesPerRow + px * 4
+        return data[o] < threshold && data[o + 1] < threshold && data[o + 2] < threshold
+    }
 }
+
