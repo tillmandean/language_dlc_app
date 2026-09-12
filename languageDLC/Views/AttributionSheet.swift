@@ -17,7 +17,7 @@ struct AttributionSheet: View {
                     """)
                     Text("Licensed under the Unicode License.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.textMuted)
                 }
                 .navyRows()
                 Section("Map data") {
@@ -30,7 +30,7 @@ struct AttributionSheet: View {
                     """)
                     Text("Natural Earth data is in the public domain.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.textMuted)
                 }
                 .navyRows()
             }

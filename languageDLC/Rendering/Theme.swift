@@ -25,6 +25,14 @@ enum Theme {
 
     /// Hairline used to separate surfaces from the navy behind them.
     static let hairline = Color(red: 0.180, green: 0.651, blue: 1.000).opacity(0.18)
+
+    /// Secondary/caption text — population counts, percentages, "Official" badges — on
+    /// `navySurface`. Deliberately *not* `.secondary`: that's a system gray tuned for near-black
+    /// system backgrounds, and composited over our lighter, blue-tinted `navySurface` it lands
+    /// around #869099 — a hue-clashing, muddy grey that reads as too dark rather than "de-
+    /// emphasized." White at this opacity keeps the same dimmed *role* while staying legible
+    /// against a navy card instead of a black one.
+    static let textMuted = Color.white.opacity(0.72)
 }
 
 extension View {

@@ -44,7 +44,7 @@ struct CountryDetailSheet: View {
                     if let population = territory?.population {
                         Text("\(population.formatted()) people")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.textMuted)
                     }
                 }
             }
@@ -75,7 +75,7 @@ struct CountryDetailSheet: View {
                 if let status = presence.status {
                     Text(status.label)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.textMuted)
                 }
                 ProgressView(value: presence.pct / 100)
                     .tint(isSelected
@@ -86,7 +86,7 @@ struct CountryDetailSheet: View {
             Spacer()
             Text("\(Int(presence.pct.rounded()))%")
                 .font(.subheadline.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.textMuted)
             Button {
                 state.toggle(language.code)
             } label: {

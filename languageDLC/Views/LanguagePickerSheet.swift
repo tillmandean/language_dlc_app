@@ -92,18 +92,18 @@ struct LanguagePickerSheet: View {
                     if let native = language.nativeName, native != language.displayName {
                         Text(native)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.textMuted)
                     }
                     Text("\(language.territories.count) countries · \(formatted(language.speakers)) speakers")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.textMuted)
                 }
 
                 Spacer()
 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(isSelected ? Theme.skyBright : .secondary)
+                    .foregroundStyle(isSelected ? Theme.skyBright : Theme.textMuted)
             }
             .contentShape(Rectangle())
         }
@@ -122,7 +122,7 @@ struct LanguagePickerSheet: View {
                         .foregroundStyle(.primary)
                     Text("\(language.territories.count) countries · \(formatted(language.speakers)) speakers")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.textMuted)
                 }
                 Spacer()
                 Text("+\(String(format: "%.1f", gain * 100))%")
